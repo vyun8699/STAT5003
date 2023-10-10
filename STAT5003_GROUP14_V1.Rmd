@@ -1,0 +1,634 @@
+---
+title: "STAT5003_14_Credit_Card_v1"
+author: "STAT5003 group project 14"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+[Note: Report to be built in rmd, submitted in HTML, with max 10 pages length in pdf]
+[Note: marking rubric not yet posted, to be checked later]
+
+```{r, include = FALSE}
+#libraries
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+library(GGally)
+library(caret)
+library(smotefamily)
+library(randomForest)
+library(reshape2)
+library(MLmetrics)
+```
+
+### Problem overview
+
+The goal of this exercise is to define 'bad debtors' based on their credit history and identify if a pattern or signal exists amongst credit applicants which may suggest the tendency of a certain cohort to become bad debtors. Management of bad debt is a key value driver in banking / the credit industry. Insights from this analysis may assist banks in acquiring the right customers (e.g. spend marketing budget on potential customers who are less likely to default) and decide on their credit risk management strategy to minimize loss (e.g. allow for different starting debt ceiling for different customer classes, sell off riskier customer portfolio and retain safer ones, etc). The dataset can be found [here](https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction).
+ 
+### Dataset description
+
+```{r, message=FALSE, warning=FALSE, results='hold'}
+# load dataset(s)
+# source: https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction
+
+#get and set path to current working directory
+path = getwd()
+setwd(path)
+
+#read csv
+application_record <- read.csv('application_record.csv', header = TRUE)
+credit_record <- read.csv('credit_record.csv', header = TRUE)
+
+# rename features for code simplicity
+application_record <- application_record %>%
+  rename (gender = CODE_GENDER,
+          car_flag = FLAG_OWN_CAR,
+          realty_flag = FLAG_OWN_REALTY,
+          children_count= CNT_CHILDREN,
+          income_total = AMT_INCOME_TOTAL,
+          income_type = NAME_INCOME_TYPE,
+          education_type = NAME_EDUCATION_TYPE,
+          family_status = NAME_FAMILY_STATUS,
+          housing_type = NAME_HOUSING_TYPE,
+          days_age = DAYS_BIRTH,
+          days_employed = DAYS_EMPLOYED,
+          mobilephone_flag=FLAG_MOBIL,
+          workphone_flag = FLAG_WORK_PHONE,
+          phone_flag = FLAG_PHONE,
+          email_flag = FLAG_EMAIL,
+          occupation_type = OCCUPATION_TYPE,
+          familymembers_count = CNT_FAM_MEMBERS
+          )
+
+credit_record <- credit_record %>%
+  rename (months_balance = MONTHS_BALANCE,
+          credit_status = STATUS
+          )
+
+#print dimensions
+cat("Dimensions of application_record: Rows =", dim(application_record)[1], "Columns =", dim(application_record)[2], "\n")
+
+cat("Dimensions of credit_record: Rows =", dim(credit_record)[1], "Columns =", dim(credit_record)[2], "\n")
+```
+The dataset is split into two files (**credit_record** and **application_record**):   
+
++ **application_record (18 features x 438k observations):**<br> 
+  This file contains collected information at the initial credit card application, such as ID, gender, occupation, number of children, marital status, etc.
+
++ **credit_record (3 features x 1+ million observations):** <br>
+  This file contains 46 thousand unique customers IDs which tracks their credit status overtime. Customers are classified into different loan status groups (e.g. 'paid off that month', '1-29 days past due', etc.).
+  
++ **credit_record** and **application_record** are connected by the feature **ID**.
+
+Key challenges that needs to be solved to analyze this dataset include: 
+
++ **Large and complex dataset**:<br>
+  The dataset contains more than 10,000 samples, a mix of numerical and categorical values, and will need to be combined for analysis. **credit_record** will need to be 'flattened' and matched with customer IDs that exists in  **application_record**. The resulting dataset must then be screened for customers with ample transaction history (e.g. we can only learn of 'bad debt' behavior when customer has existed for some time). Post pruning, we are left with a combined dataset of 20 features and 20k+ observations.
++ **Class imbalance**:<br>
+  The data is imbalanced. The number of 'bad_debtors' is small compared to the overall sample size and will need to be processed to remove bias. Data imbalance is taken into account when defining target classes (e.g. if class size is too small then predicted output will be spurious) and choosing analysis techniques (e.g. choice of performance measure, down-sampling, up-sampling, SMOTE).
+
+### Initial data analysis
+
+In summary, the project team has (i) checked for the existence of nulls, blanks, duplicates, and outliers, (ii)  trimmed the dataset to only include customer data with 20+ month of transaction history to allow enough time to pass for each customers to prove their long-term credit quality, and (iii) checked for any required data transformation.
+
+Summary output shown below:
+
+1. Checking for nulls and duplicates
+
+```{r, warning=FALSE, results='hold'}
+# check and remove NAs --> no NAs found
+na_rows_application <- application_record[!complete.cases(application_record), ]
+na_rows_credit <- credit_record[!complete.cases(credit_record), ]
+nrow_app <- nrow(na_rows_application) # no rows with NA
+nrow_cred <- nrow(na_rows_credit) # no rows with NA
+
+cat('Number of rows with null values in application_record:',nrow_app,'rows','\n')
+cat('Number of rows with null values in credit_record:',nrow_cred,'rows','\n')
+
+#OCCUPATION_TYPE has blank values (''), fill with 'Pensioner' and 'Unknown' accordingly
+
+pensioner_count <- 0
+unknown_count <- 0
+
+for (i in 1:length(application_record$occupation_type)) {
+  if (application_record$occupation_type[i] == "" && application_record$income_type[i] == "Pensioner") {
+    application_record$occupation_type[i] <- "Pensioner"
+    pensioner_count <- pensioner_count + 1
+  }
+}
+
+for (i in 1:length(application_record$occupation_type)) {
+  if (application_record$occupation_type[i] == "" ) {
+    application_record$occupation_type[i] <- "Unknown"
+    unknown_count <- unknown_count + 1
+  }
+}
+
+cat("Number of blank occupation_type filled with 'Pensioner' (inferred from 'income_type'):", pensioner_count,"cells", "\n")
+cat("Number of blank occupation_type filled with 'Unknown':", unknown_count,"cells", "\n")
+
+# check and remove duplicates in application_record 
+duplicate_rows <- application_record %>% group_by(ID) %>%filter(n() > 1)  
+nrow_dup <- nrow(duplicate_rows) 
+application_record <- application_record %>% anti_join(duplicate_rows, by = "ID")
+
+cat("Number of duplicate IDs dropped:", nrow_dup,"rows", "\n")
+```
+
+2. Dataset trimming results
+
+```{r, results='hold'}
+# Trim both dataset by common IDs
+common_ids <- intersect(application_record$ID, credit_record$ID)
+filtered_application_records <- application_record %>% filter(ID %in% common_ids) #36k x 18 fetures
+filtered_credit_records <- credit_record %>% filter(ID %in% common_ids) #777k x 3 features
+
+# We can only judge credit quality if customer has already banked with us for some time
+# setting a cut off for customers that has banked with us for more than 'threshold' months
+
+threshold <- -20 #this is a negative number since 0 = now
+
+filtered_credit_records_months <- filtered_credit_records  %>% filter(months_balance <= threshold)
+length_ids <- unique(filtered_credit_records_months$ID)
+
+cat("There are", length(length_ids),"unique IDs with more than",-threshold,"months of transaction history.","\n")
+
+# trim both datasets to to only include those that meets the threshold history
+length_filtered_application_records <- filtered_application_records %>% 
+                                          filter(ID %in% length_ids)
+length_filtered_credit_records <- filtered_credit_records %>% 
+                                          filter(ID %in% length_ids) 
+
+#dimension of filtered records
+
+cat("Dimension of trimmed application_record:", dim(length_filtered_application_records)[1], "rows x",dim(length_filtered_application_records)[2],"features.","\n")
+
+cat("Dimension of trimmed credit_record:", dim(length_filtered_credit_records)[1], "rows x",dim(length_filtered_credit_records)[2],"features.","\n")
+```
+
+3. Understanding the distribution of classes
+
+The charts below show the delinquency rate for each bad debt category - inclusive of categories below it. For example 88.9% of debtors is classified as ‘0-29 days past due’ - this is inclusive of other debtors with 30+ days past due all the way to write offs. From this chart, we decided to focus on 30+ days delinquency as our definition of ‘bad debt’ since ‘0-29 days’ is too common and could very well be an honest mistake by the customer instead of inability to service debt.
+
+```{r, echo=FALSE, warning = FALSE}
+# currently, STATUS is filled with the following values:
+    # X : No loan for the month
+    # C : paid off for the month
+    # 0 : 0-29 days past due
+    # 1 : 30-59 days past due
+    # 2 : 60-89 days past due
+    # 3 : 90-119 days past due
+    # 4 : 120-149 days past due
+    # 5 : bad debt / write off
+
+# we want to see the proportion of customers that falls into the '0' to '5' categories
+filters <- list(
+  c('0','1','2','3','4','5'),
+  c('1','2','3','4','5'),
+  c('2','3','4','5'),
+  c('3','4','5'),
+  c('4','5'),
+  c('5')
+)
+
+category_counts <- numeric(length(filters))
+category_ids <- vector("list", length(filters))
+
+for (i in seq_along(filters)) {
+  filtered_records <- length_filtered_credit_records %>% filter(credit_status %in% filters[[i]])
+  category_ids[[i]] <- unique(filtered_records$ID)
+  category_counts[i] <- length(category_ids[[i]])
+}
+
+df <- data.frame(
+  debt_category = c('0: 0-29 days past due',
+                    '1: 30-59 days past due',
+                    '2: 60-89 days past due',
+                    '3: 90-119 days past due',
+                    '4: 120-149 days past due',
+                    '5: bad debt / write off'),
+  category_count = category_counts
+)
+
+df$proportion <- df$category_count / length(length_ids)
+
+# print(df) #unhash to run
+
+bar_plot <- ggplot(df, aes(x = debt_category)) +
+  geom_bar(aes(y = category_count), stat = 'identity', fill = 'blue', alpha = 0.5) +
+  labs(title = 'Bad debtors (count)', x = 'Category', y = 'Value') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+line_plot <- ggplot(df, aes(x = debt_category)) +
+  geom_line(aes(y = proportion, group = 1), color = 'red', size = 1) +
+  geom_text(aes(y = proportion, label = percent(proportion, accuracy = 0.1)), vjust = -0.5, color = 'red') +
+  labs(title = 'Bad debtors (% total)', x = 'Category', y = 'Value') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+grid.arrange(bar_plot, line_plot, ncol = 2)
+
+```
+
+4. Extract 'relationship_length' as an additional feature and  'debt_quality' as the target.
+
+The team identified and added in the length of customer relationship as a potentialy useful feature.
+
+The team also created ‘debt_quality’ qualifiers and appended it to **application_record**. Value of ‘0’ for non-problematic debtors, ‘1’ for debtors with 30+ days past due. The team opted to define classes this way as higher classes (e.g. those with longer past dues) have very low counts which can further exacerbate the data imbalance or produce spurious relationships. 
+
+```{r, results='hide'}
+# start a new copy of the trimmed application dataset 
+application_clean <- length_filtered_application_records
+
+# add relationship_length into dataset
+relationship_length_values <- credit_record %>% group_by(ID) %>%
+  summarize(relationship_length = -min(months_balance) +1)
+
+application_clean <- application_clean %>% left_join(relationship_length_values, by = "ID")
+
+# add column debt_quality
+application_clean$debt_quality <- 0
+
+# depending on how hard we want to make this, we can choose how many flags we want, below we choose 2:
+application_clean$debt_quality[application_clean$ID %in% category_ids[[2]]] <- 1
+#application_clean$debt_quality[application_clean$ID %in% category_ids[[3]]] <- 2
+#application_clean$debt_quality[application_clean$ID %in% category_ids[[4]]] <- 3
+#application_clean$debt_quality[application_clean$ID %in% category_ids[[5]]] <- 4
+#application_clean$debt_quality[application_clean$ID %in% category_ids[[6]]] <- 5
+
+# Create a table with 'debt_quality' and 'count'
+debt_quality_counts <- table(application_clean$debt_quality)
+debt_quality_table <- data.frame(debt_quality = names(debt_quality_counts), count = as.vector(debt_quality_counts))
+
+# Print the table
+print(debt_quality_table)
+```
+
+5. Additional data cleaning
+- 'familymembers_count' was dropped due to high correlation with 'children_count'.
+- 'income_total' transformed into 'income_total_log' to address long tail. 
+- 'mobilephone_flag' was dropped as it only had a single value.
+- 'days_age' and 'days_employed' transformed into 'age_years' and 'employment_years'.
+- 'children_count' was cleaned for outliers (2 rows removed, negligible impact). 
+
+**Correlation between features improved post clean up, see below:**
+    
+```{r, echo=FALSE, warning = FALSE}
+
+
+# Plot 1: correlation before cleaning
+application_data_numerical <- application_clean %>% select_if(is.numeric)
+application_data_numerical$ID <- NULL
+
+correlation_matrix <- cor(application_data_numerical)
+
+corr_1_plot <- ggplot(data = melt(correlation_matrix), aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_minimal() +
+  labs(title = 'Correlation before clean-up')+
+  coord_fixed(ratio = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#add column income_total_log due to long tail of income_total
+application_clean$income_total_log <- log(application_clean$income_total)
+
+# Plot 3 and 4: income_total and income_total_log
+bin_count <- 20
+
+p_income_total <-ggplot(application_clean, aes(x = income_total)) +
+    geom_histogram(bins = bin_count) +
+    labs(title = 'income_total') +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p_income_total_log<-ggplot(application_clean, aes(x = income_total_log)) +
+    geom_histogram(bins = bin_count) +
+    labs(title = 'income_total_log') +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#transform days_age into age_years which is now a positive integer
+application_clean$age_years = as.integer(round(-application_clean$days_age / 365))
+
+#transform days_employed into employment_years which is now a positive integer, set minimum to 0
+application_clean$employment_years = as.integer(round(-application_clean$days_employed / 365))
+application_clean$employment_years[application_clean$employment_years < 0] <- 0 
+
+# Plot 5 and 6: days_employed and employment_years
+p_days_employed <-ggplot(application_clean, aes(x = days_employed)) +
+    geom_histogram(bins = bin_count) +
+    labs(title = 'days employed (countdown to application date)') +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+p_employment_years<-ggplot(application_clean, aes(x = employment_years)) +
+    geom_histogram(bins = bin_count) +
+    labs(title = 'years employed') +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+#drop familymembers_count as it highly correlates with children_count + spouse (spouse if married)
+application_clean$familymembers_count <- NULL
+
+#drop income_total
+application_clean$income_total <- NULL
+
+#mobilephone_flag only has 1 value = 1, drop
+application_clean$mobilephone_flag <- NULL
+
+# drop days_age
+application_clean$days_age <- NULL
+
+# drop days_employed
+application_clean$days_employed <- NULL
+
+# drop ID
+application_clean$ID <- NULL
+
+# Plot 7 and 8: children_count before and after outliers removal
+p_children_1 <- ggplot(application_data_numerical, aes(x = children_count)) +
+    geom_histogram(bins = bin_count) +
+    labs(title = 'Children_count (with outliers)')
+
+# remove outliers in children_count
+application_clean <- subset(application_clean, children_count <= 10) # 2 rows removed
+application_data_numerical <- application_clean %>% select_if(is.numeric)
+application_data_numerical$ID <- NULL
+
+p_children_2 <- ggplot(application_data_numerical, aes(x = children_count)) +
+        geom_histogram(bins = bin_count) +
+        labs(title = 'Children_count (outliers removed)')
+
+correlation_matrix <- cor(application_data_numerical)
+
+#Plot 2: correlation after cleaning
+corr_2_plot <- ggplot(data = melt(correlation_matrix), aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_minimal() +
+  labs(title = 'Correlation after clean-up')+
+  coord_fixed(ratio = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+grid.arrange(corr_1_plot, corr_2_plot,
+             #p_income_total,p_income_total_log,
+             #p_days_employed,p_employment_years,
+             #p_children_1,p_children_2, 
+             ncol = 2)
+```
+6. Post clean-up visualization:
+- **Debtor quality by occupation type**: we can make inferences that lower paid occupations may carry higher risk of bad credit.
+  - **Scatter plot**: bad debt is clumped on the left of the log income axis, suggesting a relationship between income and debt serviceability.
+  - **Box plot**: variability of log income per occupation type shown below. Any income that is too far from the median may be sign of fraud, especially since the y-axis is already in log scale.
+  
+  
+```{r, echo=FALSE, results ='hold', warning = FALSE}
+# count debt_quality > 0 for the different occupation_type
+debt_count <- application_clean %>% filter(debt_quality >0) %>% group_by(occupation_type) %>% summarise(debt_count=n())
+
+occupation_count <- application_clean %>%  group_by(occupation_type) %>% summarise(occupation_count=n()) 
+
+result <- left_join(occupation_count, debt_count, by = "occupation_type") %>%
+  mutate(ratio = debt_count / occupation_count) %>% arrange(desc(ratio))
+
+# print(result)
+
+result$occupation_type <- factor(result$occupation_type, levels = result$occupation_type)
+
+bar_plot <- ggplot(result, aes(x = occupation_type)) +
+  geom_bar(aes(y = occupation_count), stat = 'identity', fill = 'blue', position = position_dodge(width = 0.8), alpha = 0.5) + geom_bar(aes(y = debt_count), stat = 'identity', fill = 'red', position = position_dodge(width = 0.8), alpha = 0.5) +
+  labs(title = 'All debtors (count in each occupation)', x = 'Category', y = 'Value') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+line_plot <- ggplot(result, aes(x = occupation_type)) +
+  geom_line(aes(y = ratio, group = 1), color = 'red', size = 1) +
+  geom_text(aes(y = ratio, label = percent(ratio, accuracy = 0.1)), vjust = -1, color = 'red') +
+  labs(title = 'Bad debtors (% total of each occupation)', x = 'Category', y = 'Value') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+grid.arrange(bar_plot, line_plot, ncol = 2)
+
+# create scatterplot for NUMERIC(x,y) by CATEGORY(z)
+x_value <- 'employment_years'
+y_value <- 'income_total_log'
+z_value <- 'debt_quality'
+
+ggplot(application_clean, aes(x=.data[[x_value]], y=.data[[y_value]], color=.data[[z_value]])) + 
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# create boxplot for NUMERIC by CATEGORY
+x_value <-'occupation_type'
+y_value <- 'income_total_log'
+
+ggplot(application_clean, aes(x=.data[[x_value]], y=.data[[y_value]])) + 
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+### Feature Engineering
+
+[to be done later, we will pool all feature engineering scripts here and provide a quick explanation up top]
+[includes pre-processing, PCA, splits]
+
+### Classification algorithms used
+
+1. Random forest: this algorithm uses an ensemble of weak learners to make a strong learner which makes it very helpful for handling imbalances and noise, and helps us capture the most relevant features as well as non linear relationships in data.
+
+```{r}
+# PRE PROCESSING FUNCTIONS
+
+# FUNCTION: minmax scaler, to be used on numerical data in the below function
+
+minmax_scale <- function(x) {
+  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+}
+
+# FUNCTION: apply minmax to numerical data and one hot encode to categorical data.
+
+preprocess_data <- function(dataframe, target_col) {
+  #split dataframe into 3 parts for processing
+  target_data <- dataframe %>% select({{ target_col }})
+  dataframe <- dataframe %>% select(-{{ target_col }}) #take target_data out so it's not accidentally picked
+  numerical_data <- dataframe %>% select_if(is.numeric)
+  categorical_data <- dataframe %>% select_if(is.character)
+  
+  #minmax on numerical_data
+  numerical_cols <- names(numerical_data)
+  scaled_numerical_data <- numerical_data
+  
+  for (col_name in numerical_cols) {
+    scaled_col <- minmax_scale(numerical_data[[col_name]])
+    scaled_numerical_data[[col_name]] <- scaled_col
+  }
+  
+  #one hot encode on categorical_data
+  formula <- dummyVars(~ ., data = categorical_data)
+  encoded_data <- predict(formula, newdata = categorical_data)
+  
+  #transform target_col as.factor, needed for random forest
+  target_data[[target_col]] <- as.factor(target_data[[target_col]])
+  
+  #bind the three dataframes together
+  merged_data <- cbind(scaled_numerical_data, encoded_data, target_data)
+  
+  return(merged_data)
+  }
+
+#FUNCTION: rename column names (SMOTE seems to have issues with spaces and other special chars)
+rename_columns <- function(dataframe, replacements) {
+  for (replacement in replacements) {
+    for (col in names(dataframe)) {
+      new_col <- gsub(replacement$old, replacement$new, col)
+      names(dataframe)[names(dataframe) == col] <- new_col
+    }
+  }
+  return(dataframe)
+}
+
+# FUNCTION: apply SMOTE and set output as.factor to allow for randomforest
+
+apply_smote <- function(dataframe, target_col){
+  set.seed(1)
+  #target_col_data <- dataframe[,target_col]
+  
+  smote_output <- SMOTE(dataframe[, -which(names(dataframe) == target_col)],
+                      dataframe[target_col])
+                     
+  smote_data <- smote_output$data
+  smote_data[[target_col]] <- as.factor(smote_data$class)
+  smote_data <- smote_data[, -which(names(smote_data) == "class")]
+  #smote_data <- cbind(smote_data, target_col_data)
+  return (smote_data)
+}
+
+```
+
+```{r}
+#Apply minmax and one hot encode to data
+processed_data <- preprocess_data(application_clean,target_col='debt_quality')
+
+#Rename columns since it triggers error on SMOTE
+replacements <- list(
+  list(old = " ", new = "_"),
+  list(old = "/", new = "_"),
+  list(old = "-", new = "_")
+)
+
+processed_data <- rename_columns(processed_data,replacements)
+
+#Apply train test split, createDataPartition automatically stratifies classes
+set.seed(1)
+inTrain <- createDataPartition(processed_data[['debt_quality']],p=0.8)[[1]]
+processed_data.train <- processed_data[inTrain,]
+processed_data.test <- processed_data[-inTrain,]
+
+#apply SMOTE to training data only
+smote_processed_data <- apply_smote(processed_data.train,target_col='debt_quality')
+
+```
+
+```{r}
+# RF gridsearch for ntree and mtry, score is set to F1
+
+results.df <- data.frame(ntree = integer(0), mtry= integer(0), F1 = numeric(0))
+ntree_vals <- c(500,600,700,800,900,1000,1100,1200,1300)
+mtry_vals <- c(7,8,9) 
+for (ntree_val in ntree_vals){
+  for (mtry_val in mtry_vals){
+    rf.model <- randomForest(debt_quality~., data = smote_processed_data, ntree=ntree_val, mtry=mtry_val)
+    predicted <- predict(rf.model, processed_data.test[, -which(names(processed_data.test) == 'debt_quality')])
+    actual <- processed_data.test$debt_quality
+    f1_score <- F1_Score(predicted,actual)
+    results.df <- rbind(results.df,data.frame(ntree = ntree_val, mtry = mtry_val, F1 = f1_score))
+  }
+}
+
+results.df
+
+#this is taking very long
+```
+
+
+```{r}
+#plot search result
+ggplot(results.df, aes(x = ntree, y = F1, color = factor(mtry))) +
+  geom_line() +
+  labs(x = "ntree", y = "F1", color = "mtry") +
+  scale_color_discrete(name = "mtry") +
+  theme_minimal()
+
+# Find index of max F1 and get values of the associated ntree and mtry
+max_row_index <- which.max(results.df$F1)
+ntree_max <- results.df$ntree[max_row_index]
+mtry_max <- results.df$mtry[max_row_index]
+
+# Print the values
+cat("Maximum F1:", results.df$F1[max_row_index], "\n")
+cat("ntree corresponding to maximum F1:", ntree_max, "\n")
+cat("mtry corresponding to maximum F1:", mtry_max, "\n")
+```
+```{r}
+#random forest base model
+set.seed(1)
+
+#randomForest is able to handle train and test in one go, see documentation
+rf.smote.result <- randomForest(x = smote_processed_data[, -which(names(smote_processed_data) == 'debt_quality')],
+                            y = smote_processed_data$debt_quality,
+                            xtest = processed_data.test[, -which(names(processed_data.test) == 'debt_quality')],
+                            ytest = processed_data.test$debt_quality,
+                            ntree = 700, #idea: use odd numbers to break ties
+                            mtry = 7
+                            )
+
+print(rf.smote.result)
+```
+
+```{r}
+#Evaluate variable importance
+importance(rf.smote.result)
+varImpPlot(rf.smote.result)
+```
+2. Logistic regression
+
+```{r}
+
+```
+
+3. Support vector machine
+
+```{r}
+
+```
+
+
+### Classification performance evaluation
+
+[come up with several measure of train and test performance]
+[explain differences and reasoning for high/low scores]
+
+```{r}
+
+```
+
+### Conclusion
+
+[To be done later]
+[show which features are most important, if possible]
+[summarise if accurately predicting bad debtor is doable or not using application data]
+
+
+```{r}
+
+```
+
+
