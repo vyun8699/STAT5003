@@ -545,7 +545,7 @@ colnames(overall.results.df) <- col_names
 ```
 
 **1. Random forest:**<br> 
-This algorithm uses an ensemble of weak learners to make a strong learner which makes it very helpful for handling imbalances and noise, and helps us capture the most relevant features as well as non-linear relationships in data.
+Random forest is an ensemble method which combines multiple models (decision trees) to create predictions. The individual decision trees in random forest takes a random subset of features and the output of these individual decision trees are averaged to create an overall prediction which has low variance. Random forest is known for its robustness against overfitting, ability to provide information on feature importance, and high accuracy in both classification and regression tasks.
 
 ```{r, results='hold'}
 #PRE-PROCESSING
@@ -631,12 +631,11 @@ for (ntree_val in ntree_vals){
   }
 }
 
+#remove row names
 rownames(rf.results.df) <- NULL
-#rf.results.df
-```
+rf.results.df
 
-```{r, results='hold'}
-#plot search result
+#plot gridsearch results
 ggplot(rf.results.df, aes(x = ntree, y = balanced.accuracy, color = factor(mtry))) +
   geom_line() +
   labs(x = "ntree", y = "balanced accuracy", color = "mtry") +
@@ -654,28 +653,23 @@ cat("Maximum balanced accuracy:", rf.results.df$balanced.accuracy[max_row_index]
 cat("ntree corresponding to maximum balanced accuracy:", ntree_max, "\n")
 cat("mtry corresponding to maximum balanced accuracy:", mtry_max, "\n")
 
-#Maximum balanced accuracy: 0.6175 
-#ntree corresponding to maximum F1: 1100 
-#mtry corresponding to maximum F1: 8 
 ```
+
+
 ```{r}
-#random forest base model
+#random forest test score
 set.seed(1)
 
 #model
 rf.best.model <- randomForest(debt_quality ~., data = processed_data.test, ntree=ntree_max, mtry = mtry_max)
 test.pred <- predict (rf.best.model, processed_data.test[, -which(names(processed_data.test) == 'debt_quality')])
 cm.best <- confusionMatrix(test.pred, actual.test)
+#cm.best
 
-# cm.best
-```
-
-```{r, results='hold'}
-#Evaluate variable importance
-#importance(rf.best.model)
+#plot feature importance
 varImpPlot(rf.best.model)
-```
-```{r}
+#importance(rf.best.model)
+
 # store results of rf best model in overall.results.df
 overall.results.df['accuracy','RF'] <- cm.best$overall['Accuracy']
 overall.results.df['recall','RF'] <- cm.best$byClass['Sensitivity']
@@ -684,8 +678,6 @@ overall.results.df['specificity','RF'] <- cm.best$byClass['Specificity']
 overall.results.df['balanced.accuracy','RF'] <- (cm.best$byClass['Sensitivity'] + cm.best$byClass['Specificity'])/2
 overall.results.df['f1.score','RF'] <- 2*(cm.best$byClass['Precision'] * cm.best$byClass['Sensitivity'])/((cm.best$byClass['Precision'] + cm.best$byClass['Sensitivity']))
 ```
-
-
 
 2. Logistic regression
 
@@ -701,11 +693,11 @@ overall.results.df['f1.score','RF'] <- 2*(cm.best$byClass['Precision'] * cm.best
 
 
 4. linear discriminant analysis
-```{r,warning=FALSE}
+```{r,warning=FALSE, results='hold'}
 
 set.seed(14)
 
-# Train the LDA model
+# Train the LDA model, no need for pre-processing as we use SMOTE data from random forest (#1) above
 lda_model <- train(debt_quality ~ ., data = smote_processed_data, method = "lda")
 
 # Make predictions using the model
@@ -721,20 +713,18 @@ precision <- conf_mat$byClass['Pos Pred Value']
 
 
 # Print the results
-print(conf_mat)
-print(paste("Accuracy: ", acc))
-print(paste("F1 Score: ", f1))
-print(paste("Recall: ", recall))
-print(paste("Precision: ", precision))
+#print(conf_mat)
+#print(paste("Accuracy: ", acc))
+#print(paste("F1 Score: ", f1))
+#print(paste("Recall: ", recall))
+#print(paste("Precision: ", precision))
 
 overall.results.df['accuracy','LDA'] <- acc
-overall.results.df['balanced.accuracy','LDA'] <- mean(diag(conf_mat$table))
 overall.results.df['recall','LDA'] <- recall
 overall.results.df['precision','LDA'] <- precision
 overall.results.df['specificity','LDA'] <- conf_mat$byClass['Specificity']
+overall.results.df['balanced.accuracy','LDA'] <- (recall+conf_mat$byClass['Specificity'])/2
 overall.results.df['f1.score','LDA'] <- f1
-
-print(paste("Overall results ; ", overall.results.df))
 ```
 ```
 
