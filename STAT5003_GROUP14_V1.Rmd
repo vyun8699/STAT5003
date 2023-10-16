@@ -701,7 +701,30 @@ overall.results.df['f1.score','RF'] <- 2*(cm.best$byClass['Precision'] * cm.best
 
 
 4. linear discriminant analysis
+```{r,warning=FALSE}
+# Fit LDA model
+set.seed(1)
+lda.model <- lda(debt_quality ~ ., data = smote_processed_data)
 
+# Make predictions
+lda.test.pred <- predict(lda.model, processed_data.test)
+
+# Confusion matrices
+cm.lda.test <- confusionMatrix(lda.test.pred$class, actual.test)
+
+# Store results in overall.results.df
+overall.results.df['accuracy','LDA'] <- cm.lda.test$overall['Accuracy']
+overall.results.df['balanced.accuracy','LDA'] <- mean(diag(cm.lda.test$table))
+overall.results.df['recall','LDA'] <- cm.lda.test$byClass['Sensitivity']
+overall.results.df['precision','LDA'] <- cm.lda.test$byClass['Precision']
+overall.results.df['specificity','LDA'] <- cm.lda.test$byClass['Specificity']
+overall.results.df['f1.score','LDA'] <- 2 * overall.results.df['precision','LDA'] * overall.results.df['recall','LDA'] / (overall.results.df['precision','LDA'] + overall.results.df['recall','LDA'])
+
+# Print results
+print(cm.lda.test)
+print(paste("F1 Score:", overall.results.df['f1.score','LDA']))
+```
+```
 
 ### Classification performance evaluation
 
