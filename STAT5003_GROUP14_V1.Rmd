@@ -98,9 +98,7 @@ Key challenges that needs to be solved to analyze this dataset include:
 
 ### Initial data analysis and cleaning
 
-Steps taken to clean the data are shown below: 
-
-**1. Checking for nulls,blanks, and duplicates:**<br>
+**1. Screening the dataset for nulls, blanks, and duplicates:**<br>
 No nulls were found. Cells in **occupation_type** were blank (" ") for income_type = "pensioners" and were filled in accordingly. Remaining blank cells were filled with "unknown". Rows with duplicated ID numbers in application_data were dropped.
 
 ```{r, warning=FALSE, results='hold'}
@@ -236,7 +234,7 @@ grid.arrange(bar_plot, line_plot, ncol = 2)
 
 ```
 
-**4. Extract 'relationship_length' as an additional feature and  'debt_quality' as the target:** <br>
+**4. Extracting 'relationship_length' as an additional feature and  'debt_quality' as the target:** <br>
 
 The team identified and added in the length of customer relationship as a potentialy useful feature. The team also created ‘debt_quality’ qualifiers and appended it to **application_record**. Value of ‘0’ for non-problematic debtors, ‘1’ for debtors with 30+ days past due. The team opted to define classes this way as higher classes (e.g. those with longer past dues) have very low counts which can further exacerbate the data imbalance or produce spurious relationships. 
 
@@ -270,9 +268,7 @@ print(debt_quality_table)
 
 **5. Data visualization:** <br>
 
-+ **Debtor quality by occupation type**: we can make inferences that lower paid occupations may carry higher risk of bad credit. 
-+ **Box plot**: variability of total income by occupation type shown below. Any income that is too far from the median may be sign of fraud.
-  
+The charts below show composition of bad debt (by count) and income level of each occupation type. We note that some occupancy types carry higher bad debt rates and outliers.
   
 ```{r, results ='hold', warning = FALSE, fig.show='hold'}
 # count debt_quality > 0 for the different occupation_type
@@ -599,8 +595,8 @@ rf.results.df <- data.frame(ntree = integer(),
                          false.positive = integer(),
                          false.negative = integer()
                          )
-ntree_vals <- c(1100) #c(500,700,900,1100,1300)
-mtry_vals <- c(8) #c(6,7,8) 
+ntree_vals <- c(900,1100,1300) #c(500,700,900,1100,1300)
+mtry_vals <- c(6,7,8) #c(6,7,8) 
 for (ntree_val in ntree_vals){
   for (mtry_val in mtry_vals){
     #model
@@ -655,8 +651,8 @@ mtry_max <- rf.results.df$mtry[max_row_index]
 
 # Print the values
 cat("Maximum balanced accuracy:", rf.results.df$balanced.accuracy[max_row_index], "\n")
-cat("ntree corresponding to maximum F1:", ntree_max, "\n")
-cat("mtry corresponding to maximum F1:", mtry_max, "\n")
+cat("ntree corresponding to maximum balanced accuracy:", ntree_max, "\n")
+cat("mtry corresponding to maximum balanced accuracy:", mtry_max, "\n")
 
 #Maximum balanced accuracy: 0.6175 
 #ntree corresponding to maximum F1: 1100 
@@ -667,7 +663,7 @@ cat("mtry corresponding to maximum F1:", mtry_max, "\n")
 set.seed(1)
 
 #model
-rf.best.model <- randomForest(debt_quality ~., data = processed_data.test, ntree=1300, mtry = 8)
+rf.best.model <- randomForest(debt_quality ~., data = processed_data.test, ntree=ntree_max, mtry = mtry_max)
 test.pred <- predict (rf.best.model, processed_data.test[, -which(names(processed_data.test) == 'debt_quality')])
 cm.best <- confusionMatrix(test.pred, actual.test)
 
@@ -725,4 +721,6 @@ overall.results.df
 
 ```
 
+### References
 
+[.]
