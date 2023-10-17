@@ -682,6 +682,94 @@ overall.results.df['f1.score','RF'] <- 2*(cm.best$byClass['Precision'] * cm.best
 2. Logistic regression
 
 ```{r}
+# Processing variables, create dummy variables, separate categorical variables and numerical variables.
+target_data <- application_clean %>% select( 'debt_quality' )
+tmpdata <- application_clean %>% select(- 'debt_quality' ) 
+
+class_data <- tmpdata %>% select_if(is.character)
+formula <- dummyVars(~ ., data = class_data)
+encoded_data <- predict(formula, newdata = class_data)
+
+num_data <- tmpdata %>% select_if(is.numeric)
+
+merged_data <- cbind(num_data, encoded_data,target_data)
+
+merged_data[['debt_quality']] <- as.factor(merged_data[['debt_quality']])
+
+# Imbalanced dataset, hoping for balance.
+data_label1 = subset(merged_data, merged_data$debt_quality == 1)
+data_label0 = subset(merged_data, merged_data$debt_quality == 0)
+
+#To calculate the number of observations in two subsets.
+
+count_label1 <- nrow(data_label1)
+count_label0 <- nrow(data_label0)
+
+# Select the label with fewer observations and then randomly sample from that dataset to make it as many as the more populous label.
+set.seed(2)
+if (count_label1 < count_label0) {
+  data_label0 <- data_label0[sample(nrow(data_label0), count_label1), ]
+} else {
+  data_label1 <- data_label1[sample(nrow(data_label1), count_label0), ]
+}
+
+# Merge datasets
+balanced_data <- rbind(data_label0, data_label1)
+
+
+# Split the dataset into training set and test set
+
+train_index = sample(1:nrow(balanced_data), 0.8 * nrow(balanced_data))
+train_data = balanced_data[train_index, ]
+test_data = balanced_data[-train_index, ]
+
+# Perform logistic regression analysis.
+model = glm(debt_quality  ~ ., family = binomial(),data = train_data )
+
+# Training set accuracy
+glm.probs = predict(model,type='response')
+glm.pred = rep(0,length(glm.probs))
+glm.pred[glm.probs>0.5] = 1
+
+# Calculate confusion matrix and evaluation metrics
+confusion_matrix = confusionMatrix(as.factor(glm.pred), train_data$debt_quality)
+
+# Extract evaluation metrics
+LogRes.train.table= confusion_matrix$table
+LogRes.train.accuracy = confusion_matrix$overall["Accuracy"]
+LogRes.train.recall = confusion_matrix$byClass["Recall"]
+LogRes.train.precision = confusion_matrix$byClass["Precision"]
+LogRes.train.f1 = confusion_matrix$byClass["F1"]
+
+# Print out training results
+LogRes.train.table
+cat('The training set accuracy is: ',LogRes.train.accuracy,'\n')
+cat('The training set recall is: ',LogRes.train.recall,'\n')
+cat('The training set precision is: ',LogRes.train.precision,'\n')
+cat('The training set f1 is: ',LogRes.train.f1,'\n')
+
+# Testing set accuracy
+predictions = predict(model, newdata = test_data,type = "response")
+glm.pred2 = rep(0,length(predictions))
+glm.pred2[predictions>0.5] = 1
+
+# Calculate confusion matrix and evaluation metrics
+confusion_matrix2 = confusionMatrix(as.factor(glm.pred2), test_data$debt_quality)
+
+# Extract evaluation metrics
+
+LogRes.results.table = confusion_matrix2$table
+LogRes.results.accuracy = confusion_matrix2$overall["Accuracy"]
+LogRes.results.recall = confusion_matrix2$byClass["Recall"]
+LogRes.results.precision = confusion_matrix2$byClass["Precision"]
+LogRes.results.f1 = confusion_matrix2$byClass["F1"]
+
+# Print out training results
+LogRes.results.table
+cat('The testing set accuracy is: ',LogRes.results.accuracy,'\n')
+cat('The testing set recall is: ',LogRes.results.recall,'\n')
+cat('The testing set precision is: ',LogRes.results.precision,'\n')
+cat('The testing set f1 is: ',LogRes.results.f1,'\n')
 
 ```
 
