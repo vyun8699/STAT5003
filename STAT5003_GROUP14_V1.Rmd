@@ -791,40 +791,37 @@ overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
 
 
 4. linear discriminant analysis
-```{r,warning=FALSE, results='hold'}
+```{r,warning=FALSE}
 
 set.seed(14)
-
-# Train the LDA model, no need for pre-processing as we use SMOTE data from random forest (#1) above
-lda_model <- train(debt_quality ~ ., data = smote_processed_data, method = "lda")
-
-# Make predictions using the model
-predictions <- predict(lda_model, newdata = processed_data.val)
-
-# Calculate the metrics
-conf_mat <- confusionMatrix(predictions, processed_data.val$debt_quality)
-acc <- conf_mat$overall['Accuracy']
-f1 <- 2 * conf_mat$byClass['Sensitivity'] * conf_mat$byClass['Specificity'] / 
-  (conf_mat$byClass['Sensitivity'] + conf_mat$byClass['Specificity'])
-recall <- conf_mat$byClass['Sensitivity']
-precision <- conf_mat$byClass['Pos Pred Value']
+library(caret)
 
 
-# Print the results
-#print(conf_mat)
-#print(paste("Accuracy: ", acc))
-#print(paste("F1 Score: ", f1))
-#print(paste("Recall: ", recall))
-#print(paste("Precision: ", precision))
+# Train the LDA model with grid search
+lda_model <- train(debt_quality ~ ., data = smote_processed_data, method = "lda", 
+                   trControl = trainControl(method = "cv"))
 
-overall.results.df['accuracy','LDA'] <- acc
-overall.results.df['recall','LDA'] <- recall
-overall.results.df['precision','LDA'] <- precision
-overall.results.df['specificity','LDA'] <- conf_mat$byClass['Specificity']
-overall.results.df['balanced.accuracy','LDA'] <- (recall+conf_mat$byClass['Specificity'])/2
-overall.results.df['f1.score','LDA'] <- f1
+# Use the best model to make predictions on the test dataset
+test_predictions <- predict(lda_model, newdata = processed_data.test)
+test_conf_mat <- confusionMatrix(test_predictions, processed_data.test$debt_quality)
+
+# Calculate and print the test metrics
+test_acc <- test_conf_mat$overall['Accuracy']
+test_f1 <- 2 * test_conf_mat$byClass['Sensitivity'] * test_conf_mat$byClass['Specificity'] / 
+  (test_conf_mat$byClass['Sensitivity'] + test_conf_mat$byClass['Specificity'])
+test_recall <- test_conf_mat$byClass['Sensitivity']
+test_precision <- test_conf_mat$byClass['Pos Pred Value']
+
+# Update overall results dataframe for the test dataset
+overall.results.df['accuracy','LDA'] <- test_acc
+overall.results.df['balanced.accuracy','LDA'] <- mean(diag(test_conf_mat$table))
+overall.results.df['recall','LDA'] <- test_recall
+overall.results.df['precision','LDA'] <- test_precision
+overall.results.df['specificity','LDA'] <- test_conf_mat$byClass['Specificity']
+overall.results.df['f1.score','LDA'] <- test_f1
+
+print(paste("Overall results with test dataset: ", overall.results.df))
 ```
-
 
 ### Classification performance evaluation
 
