@@ -762,6 +762,8 @@ LogRes.results.table = confusion_matrix2$table
 LogRes.results.accuracy = confusion_matrix2$overall["Accuracy"]
 LogRes.results.recall = confusion_matrix2$byClass["Recall"]
 LogRes.results.precision = confusion_matrix2$byClass["Precision"]
+LogRes.results.specificity = confusion_matrix2$byClass["Specificity"]
+LogRes.results.balanced.accuracy = (LogRes.results.recall + LogRes.results.specificity)/2
 LogRes.results.f1 = confusion_matrix2$byClass["F1"]
 
 # Print out training results
@@ -770,6 +772,14 @@ cat('The testing set accuracy is: ',LogRes.results.accuracy,'\n')
 cat('The testing set recall is: ',LogRes.results.recall,'\n')
 cat('The testing set precision is: ',LogRes.results.precision,'\n')
 cat('The testing set f1 is: ',LogRes.results.f1,'\n')
+
+# store results of logres in overall.results.df
+overall.results.df['accuracy','LogRes'] <- LogRes.results.accuracy
+overall.results.df['recall','LogRes'] <- LogRes.results.recall
+overall.results.df['precision','LogRes'] <- LogRes.results.precision
+overall.results.df['specificity','LogRes'] <- LogRes.results.specificity
+overall.results.df['balanced.accuracy','LogRes'] <- LogRes.results.balanced.accuracy
+overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
 
 ```
 
@@ -814,7 +824,7 @@ overall.results.df['specificity','LDA'] <- conf_mat$byClass['Specificity']
 overall.results.df['balanced.accuracy','LDA'] <- (recall+conf_mat$byClass['Specificity'])/2
 overall.results.df['f1.score','LDA'] <- f1
 ```
-```
+
 
 ### Classification performance evaluation
 
