@@ -785,39 +785,48 @@ overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
 
 
 4. linear discriminant analysis
+LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. The key thing to note about this method is that unlike other techniques, atleast in R, it does not require any hyperparameter tuning, since the  lda() function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. 
 ```{r,warning=FALSE}
 
 set.seed(14)
-library(caret)
 
+# Set up the train control
+ctrl <- trainControl(method = "cv", number = 5)
 
-# Train the LDA model with grid search
-lda_model <- train(debt_quality ~ ., data = smote_processed_data, method = "lda", 
-                   trControl = trainControl(method = "cv"))
+# Perform LDA with cross-validation
+lda_model <- train(debt_quality ~ ., 
+                   data = smote_processed_data, 
+                   method = "lda",
+                   trControl = ctrl)
 
-# Use the best model to make predictions on the test dataset
-test_predictions <- predict(lda_model, newdata = processed_data.test)
-test_conf_mat <- confusionMatrix(test_predictions, processed_data.test$debt_quality)
+# Access the accuracy values from each iteration of the cross-validation
+cv_results <- data.frame(Accuracy = lda_model$resample$Accuracy, Iteration = 1:5)
 
-# Calculate and print the test metrics
-test_acc <- test_conf_mat$overall['Accuracy']
-test_precision <- test_conf_mat$byClass['Pos Pred Value']
-test_sensitivity <- test_conf_mat$byClass['Sensitivity']
-test_specificity <- test_conf_mat$byClass['Specificity']
-test_f1 <- 2 * test_conf_mat$byClass['Sensitivity'] * test_conf_mat$byClass['Specificity'] / 
-  (test_conf_mat$byClass['Sensitivity'] + test_conf_mat$byClass['Specificity'])
+# Plot the change in accuracy for each run of the cross-validation
+ggplot(cv_results, aes(x = Iteration, y = Accuracy)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Change in Accuracy for each Cross-Validation Run", x = "Iteration", y = "Accuracy") +
+  theme_minimal()
 
+# Print the results
+print(lda_model)
 
+# Extract the best model
+best_lda <- lda_model$finalModel
 
-# Update overall results dataframe for the test dataset
-overall.results.df['accuracy','LDA'] <- test_acc
-overall.results.df['precision','LDA'] <- test_precision
-overall.results.df['sensitivity','LDA'] <- test_sensitivity
-overall.results.df['specificity','LDA'] <- test_specificity
-overall.results.df['balanced.accuracy','LDA'] <-(test_sensitivity + test_specificity)/2
-overall.results.df['f1.score','LDA'] <- test_f1
+# Use the best model to make predictions on the test set
+test.pred <- predict(best_lda, newdata = processed_data.test[, -which(names(processed_data.test) == 'debt_quality')])
+cm_best <- confusionMatrix(test.pred$class, actual.test)
+
+# Store results of the best model in overall.results.df
+overall.results.df['accuracy', 'LDA'] <- cm_best$overall['Accuracy']
+overall.results.df['recall', 'LDA'] <- cm_best$byClass['Sensitivity']
+overall.results.df['precision', 'LDA'] <- cm_best$byClass['Precision']
+overall.results.df['specificity', 'LDA'] <- cm_best$byClass['Specificity']
+overall.results.df['balanced.accuracy', 'LDA'] <- (cm_best$byClass['Sensitivity'] + cm_best$byClass['Specificity']) / 2
 ```
-
+As you can see , the best model has been chosen after cross validating over five runs, to ensure that the best and most robust model is chosen. 
 ### Classification performance evaluation
 
 We measure model performance through **precision** (TP / (TP+FP) e.g., out of all customers predicted as bad debtors, how many are really bad debtors?) and **sensitivity** (TP/(TP+FN) e.g., out of all actual bad debtors, how many were actually flagged as bad debtors by the model?). Both of these measures are important as we want to (i) maximize the model's ability to predict true positives, and (ii) minimize intances of false positive and false negative. As displayed below, RF significantly perform better on both metrics compared to others:
