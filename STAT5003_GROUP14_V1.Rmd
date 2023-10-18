@@ -30,6 +30,7 @@ library(randomForest)
 library(reshape2)
 library(MLmetrics)
 library(ggrepel)
+library(scales)
 ```
 
 ### Problem overview
@@ -263,59 +264,46 @@ debt_quality_counts <- table(application_clean$debt_quality)
 debt_quality_table <- data.frame(debt_quality = names(debt_quality_counts), count = as.vector(debt_quality_counts))
 
 # Print the table
-print(debt_quality_table)
+print(list(debt_quality_table))
 ```
 
 **5. Data visualization:** <br>
 
 The charts below show composition of bad debt (by count) and income level of each occupation type. We note that some occupancy types carry higher bad debt rates and outliers.
   
-```{r, results ='hold', warning = FALSE, fig.show='hold'}
-# count debt_quality > 0 for the different occupation_type
-debt_count <- application_clean %>% filter(debt_quality >0) %>% group_by(occupation_type) %>% summarise(debt_count=n())
-occupation_count <- application_clean %>%  group_by(occupation_type) %>% summarise(occupation_count=n()) 
+```{r, results ='hold', warning = FALSE, fig.show='hold', width= "50%" }
+# Count bad debt by occupation type, descending order
+debt_count <- application_clean %>% 
+  filter(debt_quality >0) %>% 
+  group_by(occupation_type) %>% 
+  summarise(debt_count=n()) %>% 
+  arrange(desc(debt_count))
+
+occupation_count <- application_clean %>%  
+  group_by(occupation_type) %>% 
+  summarise(occupation_count=n()) 
 
 result <- left_join(occupation_count, debt_count, by = "occupation_type") %>%
-  mutate(ratio = debt_count / occupation_count) 
-
-# print(result)
+  mutate(ratio = debt_count / occupation_count) %>%  arrange(desc(ratio))
 
 result$occupation_type <- factor(result$occupation_type, levels = result$occupation_type)
 
-#bar_plot <- ggplot(result, aes(x = occupation_type)) +
-#  geom_bar(aes(y = occupation_count), stat = 'identity', fill = 'blue', position = position_dodge(width = 0.8), alpha = 0.5) #+ geom_bar(aes(y = debt_count), stat = 'identity', fill = 'red', position = position_dodge(width = 0.8), alpha = 0.5) +
-#  labs(title = 'Count of debtors by occupation', x = 'Category', y = 'Value') +
-#  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
 line_plot <- ggplot(result, aes(x = occupation_type)) +
   geom_line(aes(y = ratio, group = 1), color = 'red', size = 1) +
-  geom_text_repel(aes(y = ratio, label = percent(ratio, accuracy = 0.1)), 
-                  nudge_x = 0.0, nudge_y = 0.05, color = 'red') +
+  geom_text_repel(aes(y = ratio, label = percent(ratio, accuracy = 0.1)), nudge_x = 0.0, nudge_y = 0.05, color = 'red') +
   labs(title = 'Bad debtors by occupation (% total count)', x = 'Category', y = 'Value') +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-print(line_plot)
-
-#grid.arrange(bar_plot, line_plot, ncol = 2)
-
-# create scatterplot for NUMERIC(x,y) by CATEGORY(z)
-#x_value <- 'employment_years'
-#y_value <- 'income_total_log'
-#z_value <- 'debt_quality'
-
-#ggplot(application_clean, aes(x=.data[[x_value]], y=.data[[y_value]], color=.data[[z_value]])) + 
-#  geom_point() +
-#  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-# create boxplot for NUMERIC by CATEGORY
-x_value <-'occupation_type'
-y_value <- 'income_total'
-
-ggplot(application_clean, aes(x=.data[[x_value]], y=.data[[y_value]])) + 
+#Boxplot, x-axis matches line plot
+box_plot <- ggplot(application_clean, aes(x = factor(occupation_type, levels = levels(result$occupation_type)), y = income_total)) + 
   geom_boxplot() +
   labs(title = 'Boxplot of Income by Occupation Type') +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(labels = scales::number_format(scale = 1e-6, suffix = "mn")) 
 
+#print them out
+print(line_plot)
+print(box_plot)
 ```
 
 ### Feature Engineering:
@@ -339,7 +327,7 @@ corr_1_plot <- ggplot(data = melt(correlation_matrix), aes(x = Var1, y = Var2, f
   theme_minimal() +
   labs(title = 'Correlation before clean-up')+
   coord_fixed(ratio = 1) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 #add column income_total_log due to long tail of income_total
 application_clean$income_total_log <- log(application_clean$income_total)
@@ -350,12 +338,11 @@ bin_count <- 20
 p_income_total <-ggplot(application_clean, aes(x = income_total)) +
     geom_histogram(bins = bin_count) +
     labs(title = 'income_total') +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  scale_x_continuous(labels = scales::unit_format(scale = 1e-6, suffix = "mn"))
 
 p_income_total_log<-ggplot(application_clean, aes(x = income_total_log)) +
     geom_histogram(bins = bin_count) +
-    labs(title = 'income_total_log') +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    labs(title = 'income_total_log') 
 
 #transform days_age into age_years which is now a positive integer
 application_clean$age_years = as.integer(round(-application_clean$days_age / 365))
@@ -367,13 +354,12 @@ application_clean$employment_years[application_clean$employment_years < 0] <- 0
 # Plot 5 and 6: days_employed and employment_years
 p_days_employed <-ggplot(application_clean, aes(x = days_employed)) +
     geom_histogram(bins = bin_count) +
-    labs(title = 'days employed (countdown to application date)') +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    labs(title = 'days employed') +
+  scale_x_continuous(labels = scales::unit_format(scale = 1e-3, suffix = "k"))
 
 p_employment_years<-ggplot(application_clean, aes(x = employment_years)) +
     geom_histogram(bins = bin_count) +
-    labs(title = 'years employed') +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    labs(title = 'years employed') 
 
 
 #drop familymembers_count as it highly correlates with children_count + spouse (spouse if married)
@@ -419,7 +405,7 @@ corr_2_plot <- ggplot(data = melt(correlation_matrix), aes(x = Var1, y = Var2, f
   theme_minimal() +
   labs(title = 'Correlation after clean-up')+
   coord_fixed(ratio = 1) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 #feature engineering plots
 grid.arrange(p_income_total,
@@ -434,13 +420,10 @@ grid.arrange(p_income_total,
 **Correlation between features improved post clean up, see below:**
 
 ```{r}
-#layout_matrix <- rbind(c(1, 2))
-#grid.arrange(corr_1_plot, 
-#             corr_2_plot,
-#             layout_matrix = layout_matrix)
-
-print(corr_1_plot)
-print(corr_2_plot)
+layout_matrix <- rbind(c(1, 2))
+grid.arrange(corr_1_plot, 
+             corr_2_plot,
+             layout_matrix = layout_matrix)
 ```
 
 ### Pre-processing
@@ -530,22 +513,20 @@ apply_smote <- function(dataframe, target_col){
 col_names <- c("RF", "LogRes", "SVM","LDA")
 
 # Specify row names (index)
-row_names <- c("accuracy","balanced.accuracy","recall","precision","specificity","f1.score" )
+row_names <- c("accuracy","precision","sensitivity","specificity","balanced.accuracy","f1.score" )
 
 # Create an empty data frame with specified column and row names
 overall.results.df <- data.frame(matrix(NA, nrow = length(row_names), ncol = length(col_names)))
 rownames(overall.results.df) <- row_names
 colnames(overall.results.df) <- col_names
 
-# Display the empty data frame
-#print(overall.results.df)
 
 #how do assign values: row col
 # overall.results.df['accuracy','random_forest'] <- 0.85
 ```
 
 **1. Random forest:**<br> 
-Random forest is an ensemble method which combines multiple models (decision trees) to create predictions. The individual decision trees in random forest takes a random subset of features and the output of these individual decision trees are averaged to create an overall prediction which has low variance. Random forest is known for its robustness against overfitting, ability to provide information on feature importance, and high accuracy in both classification and regression tasks.
+Random forest is an ensemble method which combines multiple decision trees to create predictions. Random forest is known for its robustness against overfitting as it takes random features in each of the individual decision trees and takes an average/vote of these trees for a combined result. 
 
 ```{r, results='hold'}
 #PRE-PROCESSING
@@ -582,78 +563,90 @@ smote_processed_data <- apply_smote(processed_data.train,target_col='debt_qualit
 ```{r}
 # Model and grid search
 
+#initiate results grid
 rf.results.df <- data.frame(ntree = integer(), 
                          mtry= integer(), 
                          accuracy = numeric(),
-                         balanced.accuracy = numeric(),
-                         recall = numeric(), 
-                         precision = numeric(), 
+                         precision = numeric(),
+                         sensitivity = numeric(),
                          specificity = numeric(),
+                         balanced.accuracy = numeric(),
                          f1.score = numeric(),
                          true.positive = integer(),
                          true.negative = integer(),
                          false.positive = integer(),
                          false.negative = integer()
                          )
-ntree_vals <- c(900,1100,1300) #c(500,700,900,1100,1300)
+
+#hyperparameter grid
+ntree_vals <- c(500,700,900,1100,1300) #c(500,700,900,1100,1300)
 mtry_vals <- c(6,7,8) #c(6,7,8) 
+
+#grid search loop
 for (ntree_val in ntree_vals){
   for (mtry_val in mtry_vals){
-    #model
+    #model and val
     rf.model <- randomForest(debt_quality~., data = smote_processed_data, ntree=ntree_val, mtry=mtry_val)
-    validation.pred <- predict(rf.model, processed_data.val[, -which(names(processed_data.val) == 'debt_quality')])
-    cm <- confusionMatrix(validation.pred, actual.val)
-    
-    #results from confusion matrix
-    accuracy <- cm$overall['Accuracy']
-    recall <- cm$byClass['Sensitivity']
-    precision <- cm$byClass['Precision']
-    specificity <- cm$byClass['Specificity']
-    balanced.accuracy <- (recall + specificity) /2
-    f1.score <- 2 * precision * recall / (precision + recall)
-    true.positive <- cm$table[2,2] #true 1
-    true.negative <- cm$table[1,1] #true 0
-    false.positive <- cm$table[1,2]
-    false.negative <- cm$table[2,1]
+    rf.val <- predict(rf.model, processed_data.val[, -which(names(processed_data.val) == 'debt_quality')])
+    rf.cm <- confusionMatrix(rf.val, actual.val)
     
     #add result to dataframe
     rf.results.df <- rbind(rf.results.df,data.frame(ntree = ntree_val, mtry = mtry_val,
-                                              accuracy = accuracy,
-                                              balanced.accuracy = balanced.accuracy,
-                                              recall = recall,
-                                              precision = precision,
-                                              specificity = specificity,
-                                              f1.score = f1.score,
-                                              true.positive = true.positive,
-                                              true.negative = true.negative,
-                                              false.positive = false.positive,
-                                              false.negative = false.negative))
+                                              accuracy = rf.cm$overall['Accuracy'],
+                                              precision = rf.cm$byClass['Precision'],
+                                              sensitivity = rf.cm$byClass['Sensitivity'],
+                                              specificity = rf.cm$byClass['Specificity'],
+                                              balanced.accuracy = (rf.cm$byClass['Sensitivity'] + rf.cm$byClass['Specificity']) /2,
+                                              f1.score = 2 * rf.cm$byClass['Precision'] * rf.cm$byClass['Sensitivity'] / (rf.cm$byClass['Precision'] + rf.cm$byClass['Sensitivity']),
+                                              true.positive = rf.cm$table[2,2],
+                                              true.negative = rf.cm$table[1,1],
+                                              false.positive = rf.cm$table[1,2],
+                                              false.negative = rf.cm$table[2,1]))
   }
 }
 
 #remove row names
 rownames(rf.results.df) <- NULL
-rf.results.df
 
+#rf.results.df
+
+```
+
+```{r}
+rf.results.df
+```
+
+
+
+```{r}
 #plot gridsearch results
-ggplot(rf.results.df, aes(x = ntree, y = balanced.accuracy, color = factor(mtry))) +
+rf.precision.plot <- ggplot(rf.results.df, aes(x = ntree, y = precision, color = factor(mtry))) +
   geom_line() +
-  labs(x = "ntree", y = "balanced accuracy", color = "mtry") +
+  labs(x = "ntree", y = "precision", color = "mtry") +
   scale_color_discrete(name = "mtry") +
-  ggtitle('balanced accuracy') +
+  ggtitle('Precision') +
   theme_minimal()
 
-# Find index of max balanced accuracy and get values of the associated ntree and mtry
-max_row_index <- which.max(rf.results.df$balanced.accuracy)
+rf.sensitivity.plot <- ggplot(rf.results.df, aes(x = ntree, y = sensitivity, color = factor(mtry))) +
+  geom_line() +
+  labs(x = "ntree", y = "sensitivity", color = "mtry") +
+  scale_color_discrete(name = "mtry") +
+  ggtitle('Sensitivity') +
+  theme_minimal()
+
+grid.arrange(rf.precision.plot, rf.sensitivity.plot, ncol = 2)
+
+# Find index of max sensitivity and get values of the associated ntree and mtry
+max_row_index <- which.max(rf.results.df$sensitivity)
 ntree_max <- rf.results.df$ntree[max_row_index]
 mtry_max <- rf.results.df$mtry[max_row_index]
 
 # Print the values
-cat("Maximum balanced accuracy:", rf.results.df$balanced.accuracy[max_row_index], "\n")
+cat("Maximum sensitivity:", rf.results.df$sensitivity[max_row_index], "\n")
 cat("ntree corresponding to maximum balanced accuracy:", ntree_max, "\n")
 cat("mtry corresponding to maximum balanced accuracy:", mtry_max, "\n")
-
 ```
+
 
 
 ```{r}
@@ -662,26 +655,24 @@ set.seed(1)
 
 #model
 rf.best.model <- randomForest(debt_quality ~., data = processed_data.test, ntree=ntree_max, mtry = mtry_max)
-test.pred <- predict (rf.best.model, processed_data.test[, -which(names(processed_data.test) == 'debt_quality')])
-cm.best <- confusionMatrix(test.pred, actual.test)
-#cm.best
+rf.test.pred <- predict (rf.best.model, processed_data.test[, -which(names(processed_data.test) == 'debt_quality')])
+rf.cm.best <- confusionMatrix(rf.test.pred, actual.test)
 
-#plot feature importance
-varImpPlot(rf.best.model)
-#importance(rf.best.model)
+#plot top-10 feature importance
+varImpPlot(rf.best.model, n.var=10, main ='Top-10 most important features')
 
 # store results of rf best model in overall.results.df
-overall.results.df['accuracy','RF'] <- cm.best$overall['Accuracy']
-overall.results.df['recall','RF'] <- cm.best$byClass['Sensitivity']
-overall.results.df['precision','RF'] <- cm.best$byClass['Precision']
-overall.results.df['specificity','RF'] <- cm.best$byClass['Specificity']
-overall.results.df['balanced.accuracy','RF'] <- (cm.best$byClass['Sensitivity'] + cm.best$byClass['Specificity'])/2
-overall.results.df['f1.score','RF'] <- 2*(cm.best$byClass['Precision'] * cm.best$byClass['Sensitivity'])/((cm.best$byClass['Precision'] + cm.best$byClass['Sensitivity']))
+overall.results.df['accuracy','RF'] <- rf.cm.best$overall['Accuracy']
+overall.results.df['precision','RF'] <- rf.cm.best$byClass['Precision']
+overall.results.df['sensitivity','RF'] <- rf.cm.best$byClass['Sensitivity']
+overall.results.df['specificity','RF'] <- rf.cm.best$byClass['Specificity']
+overall.results.df['balanced.accuracy','RF'] <- (rf.cm.best$byClass['Sensitivity'] + rf.cm.best$byClass['Specificity'])/2
+overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.cm.best$byClass['Sensitivity'])/((rf.cm.best$byClass['Precision'] + rf.cm.best$byClass['Sensitivity']))
 ```
 
 2. Logistic regression
 
-```{r}
+```{r, warnings=FALSE, fig.show='hold',results='hold'}
 # Processing variables, create dummy variables, separate categorical variables and numerical variables.
 target_data <- application_clean %>% select( 'debt_quality' )
 tmpdata <- application_clean %>% select(- 'debt_quality' ) 
@@ -716,9 +707,7 @@ if (count_label1 < count_label0) {
 # Merge datasets
 balanced_data <- rbind(data_label0, data_label1)
 
-
 # Split the dataset into training set and test set
-
 train_index = sample(1:nrow(balanced_data), 0.8 * nrow(balanced_data))
 train_data = balanced_data[train_index, ]
 test_data = balanced_data[-train_index, ]
@@ -737,15 +726,19 @@ confusion_matrix = confusionMatrix(as.factor(glm.pred), train_data$debt_quality)
 # Extract evaluation metrics
 LogRes.train.table= confusion_matrix$table
 LogRes.train.accuracy = confusion_matrix$overall["Accuracy"]
-LogRes.train.recall = confusion_matrix$byClass["Recall"]
 LogRes.train.precision = confusion_matrix$byClass["Precision"]
+LogRes.train.sensitivity = confusion_matrix$byClass["Sensitivity"]
+LogRes.train.specificity = confusion_matrix$byClass["Specificity"]
+LogRes.train.balanced.accuracy = (LogRes.train.sensitivity + LogRes.train.specificity)/2
 LogRes.train.f1 = confusion_matrix$byClass["F1"]
 
 # Print out training results
 LogRes.train.table
 cat('The training set accuracy is: ',LogRes.train.accuracy,'\n')
-cat('The training set recall is: ',LogRes.train.recall,'\n')
 cat('The training set precision is: ',LogRes.train.precision,'\n')
+cat('The training set sensitivity is: ',LogRes.train.sensitivity,'\n')
+cat('The training set specificity is: ',LogRes.train.specificity,'\n')
+cat('The training set balanced accuracy is: ',LogRes.train.balanced.accuracy,'\n')
 cat('The training set f1 is: ',LogRes.train.f1,'\n')
 
 # Testing set accuracy
@@ -760,27 +753,28 @@ confusion_matrix2 = confusionMatrix(as.factor(glm.pred2), test_data$debt_quality
 
 LogRes.results.table = confusion_matrix2$table
 LogRes.results.accuracy = confusion_matrix2$overall["Accuracy"]
-LogRes.results.recall = confusion_matrix2$byClass["Recall"]
 LogRes.results.precision = confusion_matrix2$byClass["Precision"]
+LogRes.results.sensitivity = confusion_matrix2$byClass["Sensitivity"]
 LogRes.results.specificity = confusion_matrix2$byClass["Specificity"]
-LogRes.results.balanced.accuracy = (LogRes.results.recall + LogRes.results.specificity)/2
+LogRes.results.balanced.accuracy = (LogRes.results.sensitivity + LogRes.results.specificity)/2
 LogRes.results.f1 = confusion_matrix2$byClass["F1"]
 
 # Print out training results
 LogRes.results.table
 cat('The testing set accuracy is: ',LogRes.results.accuracy,'\n')
-cat('The testing set recall is: ',LogRes.results.recall,'\n')
 cat('The testing set precision is: ',LogRes.results.precision,'\n')
+cat('The testing set sensitivity is: ',LogRes.results.sensitivity,'\n')
+cat('The testing set specificity is: ',LogRes.results.specificity,'\n')
+cat('The testing set balance accuracy is: ',LogRes.results.balanced.accuracy,'\n')
 cat('The testing set f1 is: ',LogRes.results.f1,'\n')
 
 # store results of logres in overall.results.df
 overall.results.df['accuracy','LogRes'] <- LogRes.results.accuracy
-overall.results.df['recall','LogRes'] <- LogRes.results.recall
 overall.results.df['precision','LogRes'] <- LogRes.results.precision
+overall.results.df['sensitivity','LogRes'] <- LogRes.results.sensitivity
 overall.results.df['specificity','LogRes'] <- LogRes.results.specificity
 overall.results.df['balanced.accuracy','LogRes'] <- LogRes.results.balanced.accuracy
 overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
-
 ```
 
 3. Support vector machine
@@ -807,25 +801,26 @@ test_conf_mat <- confusionMatrix(test_predictions, processed_data.test$debt_qual
 
 # Calculate and print the test metrics
 test_acc <- test_conf_mat$overall['Accuracy']
+test_precision <- test_conf_mat$byClass['Pos Pred Value']
+test_sensitivity <- test_conf_mat$byClass['Sensitivity']
+test_specificity <- test_conf_mat$byClass['Specificity']
 test_f1 <- 2 * test_conf_mat$byClass['Sensitivity'] * test_conf_mat$byClass['Specificity'] / 
   (test_conf_mat$byClass['Sensitivity'] + test_conf_mat$byClass['Specificity'])
-test_recall <- test_conf_mat$byClass['Sensitivity']
-test_precision <- test_conf_mat$byClass['Pos Pred Value']
+
+
 
 # Update overall results dataframe for the test dataset
 overall.results.df['accuracy','LDA'] <- test_acc
-overall.results.df['balanced.accuracy','LDA'] <- mean(diag(test_conf_mat$table))
-overall.results.df['recall','LDA'] <- test_recall
 overall.results.df['precision','LDA'] <- test_precision
-overall.results.df['specificity','LDA'] <- test_conf_mat$byClass['Specificity']
+overall.results.df['sensitivity','LDA'] <- test_sensitivity
+overall.results.df['specificity','LDA'] <- test_specificity
+overall.results.df['balanced.accuracy','LDA'] <-(test_sensitivity + test_specificity)/2
 overall.results.df['f1.score','LDA'] <- test_f1
-
-print(paste("Overall results with test dataset: ", overall.results.df))
 ```
 
 ### Classification performance evaluation
 
-[Not final, see planned table below]
+We measure model performance through **precision** (TP / (TP+FP) e.g., out of all customers predicted as bad debtors, how many are really bad debtors?) and **sensitivity** (TP/(TP+FN) e.g., out of all actual bad debtors, how many were actually flagged as bad debtors by the model?). Both of these measures are important as we want to (i) maximize the model's ability to predict true positives, and (ii) minimize intances of false positive and false negative. As displayed below, RF significantly perform better on both metrics compared to others:
 
 ```{r}
 overall.results.df
@@ -833,13 +828,10 @@ overall.results.df
 
 ### Conclusion
 
-[To be done later]
-[show which features are most important, if possible]
-[summarise if accurately predicting bad debtor is doable or not using application data]
+We recommend Random Forest (RF) for this analysis. although it still has its limitations, as shown by its specificity score (0.58, caused by moderately high false positives). This implies that the RF model is 'too strict' whereby good debtors are flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents bias. We are comfortable with this flaw as having false positives carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
 
-```{r}
+To improve model performance, additional data may be needed (e.g. higher volume of customer data and expanding features collected at application). Other useful features that may be collected include information on wealth level, history of indebtedness at other financial institutions, criminal records,  etc.
 
-```
 
 ### References
 
