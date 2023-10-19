@@ -239,7 +239,7 @@ grid.arrange(bar_plot, line_plot, ncol = 2)
 
 The team identified and added in the length of customer relationship as a potentialy useful feature. The team also created ‘debt_quality’ qualifiers and appended it to **application_record**. Value of ‘0’ for non-problematic debtors, ‘1’ for debtors with 30+ days past due. The team opted to define classes this way as higher classes (e.g. those with longer past dues) have very low counts which can further exacerbate the data imbalance or produce spurious relationships. 
 
-```{r, warning = FALSE, results='hold'}
+```{r, message=FALSE, warning=FALSE, results='hold'}
 # start a new copy of the trimmed application dataset 
 application_clean <- length_filtered_application_records
 
@@ -264,7 +264,7 @@ debt_quality_counts <- table(application_clean$debt_quality)
 debt_quality_table <- data.frame(debt_quality = names(debt_quality_counts), count = as.vector(debt_quality_counts))
 
 # Print the table
-print(list(debt_quality_table))
+debt_quality_table
 ```
 
 **5. Data visualization:** <br>
@@ -526,9 +526,9 @@ colnames(overall.results.df) <- col_names
 ```
 
 **1. Random forest:**<br> 
-Random forest is an ensemble method which combines multiple decision trees to create predictions. Random forest is known for its robustness against overfitting as it takes random features in each of the individual decision trees and takes an average/vote of these trees for a combined result. 
+Random forest is an ensemble method which combines multiple decision trees to create predictions. Random forest is known for its robustness against overfitting as it takes random features in each of the individual decision trees and takes an average/vote of these trees for a combined result. Score charts and parameters for best performance shown below:
 
-```{r, results='hold'}
+```{r, message=FALSE, warning=FALSE, results='hold'}
 #PRE-PROCESSING
 
 # 1. Apply minmax and one hot encode to data
@@ -560,7 +560,7 @@ actual.val <- processed_data.val$debt_quality
 smote_processed_data <- apply_smote(processed_data.train,target_col='debt_quality')
 ```
 
-```{r}
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 # Model and grid search
 
 #initiate results grid
@@ -610,15 +610,6 @@ rownames(rf.results.df) <- NULL
 
 #rf.results.df
 
-```
-
-```{r}
-rf.results.df
-```
-
-
-
-```{r}
 #plot gridsearch results
 rf.precision.plot <- ggplot(rf.results.df, aes(x = ntree, y = precision, color = factor(mtry))) +
   geom_line() +
@@ -645,11 +636,12 @@ mtry_max <- rf.results.df$mtry[max_row_index]
 cat("Maximum sensitivity:", rf.results.df$sensitivity[max_row_index], "\n")
 cat("ntree corresponding to maximum balanced accuracy:", ntree_max, "\n")
 cat("mtry corresponding to maximum balanced accuracy:", mtry_max, "\n")
+
 ```
 
+Top-10 most important features (by Gini impurity)  shown below. We can see that 'relationship_length', 'age_years', 'income_total_log', and 'employment_years' are the key drivers to prediction outcome. 
 
-
-```{r}
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #random forest test score
 set.seed(1)
 
@@ -672,7 +664,7 @@ overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.c
 
 2. Logistic regression
 
-```{r, warnings=FALSE, fig.show='hold',results='hold'}
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 # Processing variables, create dummy variables, separate categorical variables and numerical variables.
 target_data <- application_clean %>% select( 'debt_quality' )
 tmpdata <- application_clean %>% select(- 'debt_quality' ) 
@@ -779,14 +771,14 @@ overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
 
 3. Support vector machine
 
-```{r}
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 
 ```
 
 
 4. linear discriminant analysis
 LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. The key thing to note about this method is that unlike other techniques, atleast in R, it does not require any hyperparameter tuning, since the  lda() function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. All the preprocessing necessary for LDA has already been done under Random Forest, so the same data will be used.  
-```{r,warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 
 set.seed(14)
 
@@ -831,9 +823,9 @@ As you can see , the best model has been chosen after cross validating over five
 
 ### Classification performance evaluation
 
-We measure model performance through **precision** (TP / (TP+FP) e.g., out of all customers predicted as bad debtors, how many are really bad debtors? and **sensitivity** (TP/(TP+FN) e.g., out of all actual bad debtors, how many were actually flagged as bad debtors by the model?. Both of these measures are important as we want to (i) maximize the model's ability to predict true positives, and (ii) minimize intances of false positive and false negative. As displayed below, RF significantly perform better on both metrics compared to others:
+We measure model performance through **precision** (TP / (TP+FP)) e.g., out of all customers predicted as bad debtors, how many are really bad debtors? and **sensitivity** (TP/(TP+FN)) e.g., out of all actual bad debtors, how many were actually flagged as bad debtors by the model?. Both of these measures are important as we want to (i) maximize the model's ability to predict true positives, and (ii) minimize intances of false positive and false negative. As displayed below, RF significantly perform better on both metrics compared to others:
 
-```{r}
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 overall.results.df
 ```
 

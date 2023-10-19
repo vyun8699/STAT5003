@@ -1,0 +1,186 @@
+---
+title: "Assignment_2b_presentation"
+author: "vyun8699"
+date: "`r Sys.Date()`"
+output: 
+  xaringan::moon_reader:
+    nature:
+      autoplay: 5000
+      countdown: 5000
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+#libraries
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(scales)
+library(GGally)
+library(caret)
+library(smotefamily)
+library(randomForest)
+library(reshape2)
+library(MLmetrics)
+library(ggrepel)
+library(scales)
+```
+
+## 1. Data and goal
+
+**Goal**: Define 'bad debtors' based on their credit history. Management of bad debt is a key value driver in banking / the credit industry. 
+
+Two datasets were provided:
++ **application_record (18 features x 438k observations):**<br> 
+  Features: credit card application, such as ID, gender, occupation, number of children, marital status, etc.
+
++ **credit_record (3 features x 1+ million observations):** <br>
+  Customers are classified into different loan status groups (e.g. 'paid off that month', '1-29 days past due', etc.).
+-------------------------
+Dimensions:
+```{r, include=FALSE}
+# load dataset(s)
+# source: https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction
+
+#get and set path to current working directory
+path = getwd()
+setwd(path)
+
+#read csv
+application_record <- read.csv('application_record.csv', header = TRUE)
+credit_record <- read.csv('credit_record.csv', header = TRUE)
+
+# rename features for code simplicity
+application_record <- application_record %>%
+  rename (gender = CODE_GENDER,
+          car_flag = FLAG_OWN_CAR,
+          realty_flag = FLAG_OWN_REALTY,
+          children_count= CNT_CHILDREN,
+          income_total = AMT_INCOME_TOTAL,
+          income_type = NAME_INCOME_TYPE,
+          education_type = NAME_EDUCATION_TYPE,
+          family_status = NAME_FAMILY_STATUS,
+          housing_type = NAME_HOUSING_TYPE,
+          days_age = DAYS_BIRTH,
+          days_employed = DAYS_EMPLOYED,
+          mobilephone_flag=FLAG_MOBIL,
+          workphone_flag = FLAG_WORK_PHONE,
+          phone_flag = FLAG_PHONE,
+          email_flag = FLAG_EMAIL,
+          occupation_type = OCCUPATION_TYPE,
+          familymembers_count = CNT_FAM_MEMBERS
+          )
+
+credit_record <- credit_record %>%
+  rename (months_balance = MONTHS_BALANCE,
+          credit_status = STATUS
+          )
+```
+
+```{r, echo = FALSE, fig.show='hold', results='hold', message=FALSE, highlight.output = c(1,2)}
+#print dimensions
+cat("Dimensions of application_record: Rows =", dim(application_record)[1], "Columns =", dim(application_record)[2], "\n")
+cat("Dimensions of credit_record: Rows =", dim(credit_record)[1], "Columns =", dim(credit_record)[2], "\n")
+```
+-------------------------
+---
+## 2. Application record
+
+Information on credit applicants at point of application.
+Outliers detected, income needs to be transformed.
+
+```{r, echo = FALSE, fig.show='hold', results='hold', message=FALSE}
+summary(cars)
+```
+
+---
+## 3. Credit record
+
+Information on how credit application performs through time.
+[values]
+
+```{r, echo = FALSE, fig.show='hold', results='hold', message=FALSE}
+summary(cars)
+```
+
+---
+## 4. Challenges with dataset
+
++ **Large and complex dataset**:<br>
+  The dataset contains more than 10,000 samples, a mix of numerical and categorical values, and will need to be combined for analysis. **credit_record** will need to be 'flattened' and matched with customer IDs that exists in  **application_record**. The resulting dataset must then be screened for customers with ample transaction history (e.g. we can only learn of 'bad debt' behavior when customer has existed for some time). Post pruning, we are left with a combined dataset of 20 features and 20k+ observations.
+  
++ **Class imbalance**:<br>
+  The data is imbalanced. The number of 'bad_debtors' is small compared to the overall sample size and will need to be processed to remove bias. Data imbalance is taken into account when defining target classes (e.g. if class size is too small then predicted output will be spurious) and choosing analysis techniques (e.g. choice of performance measure, down-sampling, up-sampling, SMOTE).
+
+```{r, echo = FALSE, fig.show='hold', results='hold', message=FALSE}
+summary(cars)
+```
+
+---
+## 5. Data combination and cleaning (1/2)
+
+ddd
+
+```{r, echo = FALSE, fig.show='hold', results='hold', message=FALSE}
+summary(cars)
+```
+
+---
+## 6. Data combination and cleaning (2/2)
+```{r, echo = FALSE, fig.show='hold', results='hold', message=FALSE}
+summary(cars)
+```
+
+---
+
+## 7. [spare]
+
+
+---
+## 8. Pre-processing
+aaa
+
+```{r, echo = FALSE, fig.show='hold', results='hold', message=FALSE}
+summary(cars)
+```
+
+---
+## 9. Model 1: Random Forest (1/2)
+[explanation, train results]
+
+---
+## 10. Model 1: Random Forest (2/2)
+[interpretation]
+---
+## 11. Model 2: Log Regression (1/2)
+[explanation, train results]
+---
+## 12. Model 2: Log Regression (2/2)
+[interpretation]
+---
+## 13. Model 3: Support Vector Machine (1/2)
+[explanation, train results]
+---
+## 14. Model 3: Support Vector Machine (2/2)
+[interpretation]
+---
+## 15. Model 4: Linear Discriminant Analysis (1/2)
+[explanation, train results]
+---
+## 16. Model 4: Linear Discriminant Analysis (2/2)
+[interpretation]
+---
+## 17. Testing results
+
+---
+## 18. Proposed model
+
+---
+## 19. Limitation and recommendation for future work
+
+---
+## 20. [Spare]
