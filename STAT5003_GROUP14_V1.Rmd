@@ -770,6 +770,51 @@ overall.results.df['balanced.accuracy','LogRes'] <- LogRes.results.balanced.accu
 overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
 ```
 
+```{r}
+#library(caret)
+#library(glmnet)
+
+# Grid-search for logistic regression
+# Define the grid
+hyper_grid <- expand.grid(
+  alpha = seq(0, 1, by=0.1), # from ridge (0) to lasso (1)
+  lambda = c(0.001, 0.01, 0.1, 1, 10)
+)
+
+# Define the control for training
+train_control <- trainControl(
+  method = "cv", 
+  number = 5, 
+  search = "grid"
+)
+
+# Train the model using the grid search
+grid_search <- train(
+  debt_quality ~ .,
+  data = train_data,
+  method = "glmnet",
+  trControl = train_control,
+  tuneGrid = hyper_grid
+)
+
+# Print the best hyperparameters
+print(grid_search$bestTune)
+
+# Predict using the best model
+#predictions <- predict(grid_search, newdata = test_data)
+
+# Match the best model's row
+best_row <- which(grid_search$results$alpha == grid_search$bestTune$alpha & 
+                 grid_search$results$lambda == grid_search$bestTune$lambda)
+
+# Extract best model's performance
+best_model_performance <- grid_search$results[best_row, ]
+
+# Print best model's accuracy
+cat("Best model's accuracy:", best_model_performance$Accuracy, "\n")
+```
+
+
 **3. linear discriminant analysis:** <br>
 LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. The key thing to note about this method is that unlike other techniques, atleast in R, it does not require any hyperparameter tuning, since the  lda() function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. All the preprocessing necessary for LDA has already been done under Random Forest, so the same data will be used.  
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
