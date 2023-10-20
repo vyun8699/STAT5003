@@ -662,7 +662,8 @@ overall.results.df['balanced.accuracy','RF'] <- (rf.cm.best$byClass['Sensitivity
 overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.cm.best$byClass['Sensitivity'])/((rf.cm.best$byClass['Precision'] + rf.cm.best$byClass['Sensitivity']))
 ```
 
-2. Logistic regression
+**2. Logistic regression:**<br>
+
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 # Processing variables, create dummy variables, separate categorical variables and numerical variables.
@@ -769,14 +770,7 @@ overall.results.df['balanced.accuracy','LogRes'] <- LogRes.results.balanced.accu
 overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
 ```
 
-3. Support vector machine
-
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
-
-```
-
-
-4. linear discriminant analysis
+**3. linear discriminant analysis:** <br>
 LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. The key thing to note about this method is that unlike other techniques, atleast in R, it does not require any hyperparameter tuning, since the  lda() function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. All the preprocessing necessary for LDA has already been done under Random Forest, so the same data will be used.  
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 
@@ -819,6 +813,108 @@ overall.results.df['specificity', 'LDA'] <- cm_best$byClass['Specificity']
 overall.results.df['balanced.accuracy', 'LDA'] <- (cm_best$byClass['Sensitivity'] + cm_best$byClass['Specificity']) / 2
 ```
 As you can see , the best model has been chosen after cross validating over five runs, to ensure that the best and most robust model is chosen. 
+
+**4. Support vector machine:** <br>
+SVM is a powerful supervised algorithm that can perform well in handling complex datasets with non-linear decision boundaries by utilizing kernel functions to transform the data into a high-dimensional space.
+
+
+
+
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+#create train and test data
+
+processed_data <- preprocess_data(application_clean, target_col='debt_quality')
+
+#apply train test split, createDataPartition automatically stratifies classes
+set.seed(5003)
+inTrain <- createDataPartition(processed_data[['debt_quality']],p=0.8)[[1]]
+processed_data.train <- processed_data[inTrain,]
+processed_data.test <- processed_data[-inTrain,]
+
+```
+
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+#libraries
+library(e1071)
+library(MASS)
+library(mlr)
+
+# Apply grid search for SVM
+
+col_names <- colnames(processed_data.train)
+fixed_col_names <- make.names(col_names, unique = TRUE)
+colnames(processed_data.train) <- fixed_col_names
+task <- makeClassifTask(data = processed_data.train, target = "debt_quality")
+
+# creat params
+ps <- makeParamSet(
+  makeDiscreteParam("cost", values = c(0.001, 0.01, 0.1, 1, 10)),
+  makeDiscreteParam("gamma", values = c(0.0001, 0.001, 0.01, 0.1, 1))
+)
+
+# create a makelearner
+learner <- makeLearner("classif.svm", predict.type = "prob")
+
+# run grid search
+res <- tuneParams(learner, task, resampling = cv3, par.set = ps, control = makeTuneControlGrid())
+
+# take a long time to search
+print(res$x)
+
+```
+
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+#Utilize various feature selection techniques
+
+tuned_params = res$x
+
+#Use pca for selecting features
+select_data <- preProcess(processed_data.train, method = "pca", pcaComp = 10)
+train_data_pca <- predict(select_data, processed_data.train)
+test_data_pca <- predict(select_data, processed_data.test)
+pca.svm.model <- svm(debt_quality ~ ., data = train_data_pca, kernel = "radial", cost = tuned_params[0], gamma = tuned_params[1])
+
+#Use lda for selecting features
+select_data <- lda(debt_quality ~ .,data = processed_data.train)
+train_data_lda <- as.data.frame(predict(select_data, processed_data.train)$x)
+train_data_lda$debt_quality <- processed_data.train$debt_quality
+test_data_lda <- as.data.frame(predict(select_data, processed_data.test)$x)
+test_data_lda$debt_quality <- processed_data.test$debt_quality
+lda.svm.model <-  svm(debt_quality ~ ., data = train_data_lda, kernel = "radial", cost = tuned_params[0], gamma = tuned_params[1])
+
+```
+
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+# Predict on the test data set using pca
+pca.svm.predictions <- predict(pca.svm.model, test_data_pca)
+confusion_matrix_pca <- confusionMatrix(pca.svm.predictions, reference = test_data_pca$debt_quality)
+# Print out training results
+confusion_matrix_pca$table
+cat('The testing set accuracy is: ',confusion_matrix_pca$overall["Accuracy"],'\n')
+cat("Precision:",  confusion_matrix_pca$byClass["Precision"], "\n")
+cat("Recall:",  confusion_matrix_pca$byClass["Recall"], "\n")
+cat("F1 Score:", 2 * (confusion_matrix_pca$byClass["Precision"] * confusion_matrix_pca$byClass["Recall"]) / (confusion_matrix_pca$byClass["Precision"] + confusion_matrix_pca$byClass["Recall"]), "\n")
+
+```
+
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+# Predict on the test data set using pca
+lda.svm.predictions <- predict(lda.svm.model, test_data_lda)
+confusion_matrix_lda <- confusionMatrix(lda.svm.predictions, reference = test_data_lda$debt_quality)
+#confusion_matrix_lda
+confusion_matrix_lda$table
+cat('The testing set accuracy is: ',confusion_matrix_lda$overall["Accuracy"],'\n')
+cat("Precision:",  confusion_matrix_lda$byClass["Precision"], "\n")
+cat("Recall:",  confusion_matrix_lda$byClass["Recall"], "\n")
+cat("F1 Score:", 2 * (confusion_matrix_lda$byClass["Precision"] * confusion_matrix_lda$byClass["Recall"]) / (confusion_matrix_lda$byClass["Precision"] + confusion_matrix_lda$byClass["Recall"]), "\n")
+
+overall.results.df['accuracy', 'SVM'] <- confusion_matrix_lda$overall["Accuracy"]
+overall.results.df['recall', 'SVM'] <- confusion_matrix_lda$byClass["Sensitivity"]
+overall.results.df['precision', 'SVM'] <- confusion_matrix_lda$byClass["Precision"]
+overall.results.df['specificity', 'SVM'] <- confusion_matrix_lda$byClass["Specificity"]
+overall.results.df['balanced.accuracy', 'SVM'] <- (confusion_matrix_lda$byClass["Sensitivity"] + confusion_matrix_lda$byClass["Specificity"]) / 2
+
+```
 
 
 ### Classification performance evaluation
