@@ -807,7 +807,7 @@ cm_best <- confusionMatrix(test.pred$class, actual.test)
 
 # Store results of the best model in overall.results.df
 overall.results.df['accuracy', 'LDA'] <- cm_best$overall['Accuracy']
-overall.results.df['recall', 'LDA'] <- cm_best$byClass['Sensitivity']
+overall.results.df['sensitivity', 'LDA'] <- cm_best$byClass['Sensitivity']
 overall.results.df['precision', 'LDA'] <- cm_best$byClass['Precision']
 overall.results.df['specificity', 'LDA'] <- cm_best$byClass['Specificity']
 overall.results.df['balanced.accuracy', 'LDA'] <- (cm_best$byClass['Sensitivity'] + cm_best$byClass['Specificity']) / 2
