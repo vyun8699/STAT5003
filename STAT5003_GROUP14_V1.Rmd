@@ -529,7 +529,7 @@ colnames(overall.results.df) <- col_names
 **1. Random forest:**<br> 
 Random forest is an ensemble method which combines multiple decision trees to create predictions. Random forest is known for its robustness against overfitting as it takes random features in each of the individual decision trees and takes an average/vote of these trees for a combined result. Score charts and parameters for best performance shown below:
 
-```{r, message=FALSE, warning=FALSE, results='hold'}
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #PRE-PROCESSING
 
 # 1. Apply minmax and one hot encode to data
@@ -634,9 +634,10 @@ ntree_max <- rf.results.df$ntree[max_row_index]
 mtry_max <- rf.results.df$mtry[max_row_index]
 
 # Print the values
-cat("Maximum sensitivity:", rf.results.df$sensitivity[max_row_index], "\n")
-cat("ntree corresponding to maximum balanced accuracy:", ntree_max, "\n")
-cat("mtry corresponding to maximum balanced accuracy:", mtry_max, "\n")
+cat('The RF model is optimized for maximum sensitivity, to minimize false negatives:')
+cat("- Maximum sensitivity on training set:", rf.results.df$sensitivity[max_row_index], "\n")
+cat("- ntree corresponding to maximum balanced accuracy:", ntree_max, "\n")
+cat("- mtry corresponding to maximum balanced accuracy:", mtry_max, "\n")
 
 ```
 
