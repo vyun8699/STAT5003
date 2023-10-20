@@ -774,6 +774,18 @@ overall.results.df['sensitivity','LogRes'] <- LogRes.results.sensitivity
 overall.results.df['specificity','LogRes'] <- LogRes.results.specificity
 overall.results.df['balanced.accuracy','LogRes'] <- LogRes.results.balanced.accuracy
 overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
+
+results <- grid_search$results
+# Plot
+ggplot(results, aes(x = lambda, y = Accuracy, color = as.factor(alpha))) +
+  geom_line(aes(group = alpha)) +
+  geom_point() +
+  scale_x_log10() + # Lambda values are often plotted on a log scale for better visualization
+  labs(title = "Accuracy based on Grid Search Results",
+       x = "Lambda (Log Scale)",
+       y = "Accuracy",
+       color = "Alpha") +
+  theme_minimal()
 ```
 
 
