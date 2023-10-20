@@ -890,11 +890,11 @@ cat("Precision:",  confusion_matrix_pca$byClass["Precision"], "\n")
 cat("Recall:",  confusion_matrix_pca$byClass["Recall"], "\n")
 cat("F1 Score:", 2 * (confusion_matrix_pca$byClass["Precision"] * confusion_matrix_pca$byClass["Recall"]) / (confusion_matrix_pca$byClass["Precision"] + confusion_matrix_pca$byClass["Recall"]), "\n")
 
-overall.results.df['accuracy', 'SVM'] <- confusion_matrix_lda$overall["Accuracy"]
-overall.results.df['recall', 'SVM'] <- confusion_matrix_lda$byClass["Sensitivity"]
-overall.results.df['precision', 'SVM'] <- confusion_matrix_lda$byClass["Precision"]
-overall.results.df['specificity', 'SVM'] <- confusion_matrix_lda$byClass["Specificity"]
-overall.results.df['balanced.accuracy', 'SVM'] <- (confusion_matrix_lda$byClass["Sensitivity"] + confusion_matrix_lda$byClass["Specificity"]) / 2
+overall.results.df['accuracy', 'SVM'] <- confusion_matrix_pca$overall["Accuracy"]
+overall.results.df['recall', 'SVM'] <- confusion_matrix_pca$byClass["Sensitivity"]
+overall.results.df['precision', 'SVM'] <- confusion_matrix_pca$byClass["Precision"]
+overall.results.df['specificity', 'SVM'] <- confusion_matrix_pca$byClass["Specificity"]
+overall.results.df['balanced.accuracy', 'SVM'] <- (confusion_matrix_pca$byClass["Sensitivity"] + confusion_matrix_pca$byClass["Specificity"]) / 2
 
 ```
 
