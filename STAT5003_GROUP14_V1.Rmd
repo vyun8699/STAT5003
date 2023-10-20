@@ -31,6 +31,7 @@ library(reshape2)
 library(MLmetrics)
 library(ggrepel)
 library(scales)
+library(glmnet)
 ```
 
 ### Problem overview
@@ -579,8 +580,8 @@ rf.results.df <- data.frame(ntree = integer(),
                          )
 
 #hyperparameter grid
-ntree_vals <- c(500,700,900,1100,1300) #c(500,700,900,1100,1300)
-mtry_vals <- c(6,7,8) #c(6,7,8) 
+ntree_vals <- c(500,700,900,1100,1300) 
+mtry_vals <- c(6,7,8) 
 
 #grid search loop
 for (ntree_val in ntree_vals){
@@ -818,6 +819,7 @@ overall.results.df['sensitivity', 'LDA'] <- cm_best$byClass['Sensitivity']
 overall.results.df['precision', 'LDA'] <- cm_best$byClass['Precision']
 overall.results.df['specificity', 'LDA'] <- cm_best$byClass['Specificity']
 overall.results.df['balanced.accuracy', 'LDA'] <- (cm_best$byClass['Sensitivity'] + cm_best$byClass['Specificity']) / 2
+overall.results.df['f1.score', 'LDA'] <-2*(cm_best$byClass['Precision'] * cm_best$byClass['Sensitivity'])/((cm_best$byClass['Precision'] + cm_best$byClass['Sensitivity']))
 ```
 As you can see , the best model has been chosen after cross validating over five runs, to ensure that the best and most robust model is chosen. 
 
@@ -837,6 +839,7 @@ processed_data.train <- processed_data[inTrain,]
 processed_data.test <- processed_data[-inTrain,]
 
 ```
+
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #libraries
 library(e1071)
@@ -896,10 +899,11 @@ cat("Recall:",  confusion_matrix_pca$byClass["Recall"], "\n")
 cat("F1 Score:", 2 * (confusion_matrix_pca$byClass["Precision"] * confusion_matrix_pca$byClass["Recall"]) / (confusion_matrix_pca$byClass["Precision"] + confusion_matrix_pca$byClass["Recall"]), "\n")
 
 overall.results.df['accuracy', 'SVM'] <- confusion_matrix_pca$overall["Accuracy"]
-overall.results.df['recall', 'SVM'] <- confusion_matrix_pca$byClass["Sensitivity"]
+overall.results.df['sensitivity', 'SVM'] <- confusion_matrix_pca$byClass["Sensitivity"]
 overall.results.df['precision', 'SVM'] <- confusion_matrix_pca$byClass["Precision"]
 overall.results.df['specificity', 'SVM'] <- confusion_matrix_pca$byClass["Specificity"]
 overall.results.df['balanced.accuracy', 'SVM'] <- (confusion_matrix_pca$byClass["Sensitivity"] + confusion_matrix_pca$byClass["Specificity"]) / 2
+overall.results.df['f1.score', 'SVM'] <- 2*(confusion_matrix_pca$byClass['Precision'] * confusion_matrix_pca$byClass['Sensitivity'])/((confusion_matrix_pca$byClass['Precision'] + confusion_matrix_pca$byClass['Sensitivity']))
 
 ```
 
