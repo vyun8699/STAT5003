@@ -705,54 +705,58 @@ train_index = sample(1:nrow(balanced_data), 0.8 * nrow(balanced_data))
 train_data = balanced_data[train_index, ]
 test_data = balanced_data[-train_index, ]
 
-# Perform logistic regression analysis.
-model = glm(debt_quality  ~ ., family = binomial(),data = train_data )
+# Grid search for logistic regression
+# Define the grid
+hyper_grid <- expand.grid(
+  alpha = seq(0, 1, by=0.1), # from ridge (0) to lasso (1)
+  lambda = c(0.001, 0.01, 0.1, 1, 10)
+)
 
-# Training set accuracy
-glm.probs = predict(model,type='response')
-glm.pred = rep(0,length(glm.probs))
-glm.pred[glm.probs>0.5] = 1
+# Define the control for training
+train_control <- trainControl(
+  method = "cv", 
+  number = 5, 
+  search = "grid"
+)
 
-# Calculate confusion matrix and evaluation metrics
-confusion_matrix = confusionMatrix(as.factor(glm.pred), train_data$debt_quality)
+# Train the model using the grid search
+grid_search <- train(
+  debt_quality ~ .,
+  data = train_data,
+  method = "glmnet",
+  trControl = train_control,
+  tuneGrid = hyper_grid
+)
+
+# Extract the best hyperparameters from the grid search
+best_alpha <- grid_search$bestTune$alpha
+best_lambda <- grid_search$bestTune$lambda
+
+# Train the glmnet model using the best hyperparameters
+set.seed(123) # for reproducibility
+fit <- glmnet(as.matrix(train_data[, -ncol(train_data)]), # predictors
+              train_data$debt_quality, # response
+              alpha = best_alpha, 
+              lambda = best_lambda, 
+              family = "binomial")
+
+# Predict using the best model on the test data
+test_probs <- predict(fit, newx = as.matrix(test_data[, -ncol(test_data)]), type = "response")
+test_pred <- ifelse(test_probs > 0.5, 1, 0)
+
+# Evaluate the model's performance on the test data using confusionMatrix
+confusion_matrix_updated <- confusionMatrix(as.factor(test_pred), as.factor(test_data$debt_quality))
 
 # Extract evaluation metrics
-LogRes.train.table= confusion_matrix$table
-LogRes.train.accuracy = confusion_matrix$overall["Accuracy"]
-LogRes.train.precision = confusion_matrix$byClass["Precision"]
-LogRes.train.sensitivity = confusion_matrix$byClass["Sensitivity"]
-LogRes.train.specificity = confusion_matrix$byClass["Specificity"]
-LogRes.train.balanced.accuracy = (LogRes.train.sensitivity + LogRes.train.specificity)/2
-LogRes.train.f1 = confusion_matrix$byClass["F1"]
-
-# Print out training results
-LogRes.train.table
-cat('The training set accuracy is: ',LogRes.train.accuracy,'\n')
-cat('The training set precision is: ',LogRes.train.precision,'\n')
-cat('The training set sensitivity is: ',LogRes.train.sensitivity,'\n')
-cat('The training set specificity is: ',LogRes.train.specificity,'\n')
-cat('The training set balanced accuracy is: ',LogRes.train.balanced.accuracy,'\n')
-cat('The training set f1 is: ',LogRes.train.f1,'\n')
-
-# Testing set accuracy
-predictions = predict(model, newdata = test_data,type = "response")
-glm.pred2 = rep(0,length(predictions))
-glm.pred2[predictions>0.5] = 1
-
-# Calculate confusion matrix and evaluation metrics
-confusion_matrix2 = confusionMatrix(as.factor(glm.pred2), test_data$debt_quality)
-
-# Extract evaluation metrics
-
-LogRes.results.table = confusion_matrix2$table
-LogRes.results.accuracy = confusion_matrix2$overall["Accuracy"]
-LogRes.results.precision = confusion_matrix2$byClass["Precision"]
-LogRes.results.sensitivity = confusion_matrix2$byClass["Sensitivity"]
-LogRes.results.specificity = confusion_matrix2$byClass["Specificity"]
+LogRes.results.table = confusion_matrix_updated$table
+LogRes.results.accuracy = confusion_matrix_updated$overall["Accuracy"]
+LogRes.results.precision = confusion_matrix_updated$byClass["Precision"]
+LogRes.results.sensitivity = confusion_matrix_updated$byClass["Sensitivity"]
+LogRes.results.specificity = confusion_matrix_updated$byClass["Specificity"]
 LogRes.results.balanced.accuracy = (LogRes.results.sensitivity + LogRes.results.specificity)/2
-LogRes.results.f1 = confusion_matrix2$byClass["F1"]
+LogRes.results.f1 = confusion_matrix_updated$byClass["F1"]
 
-# Print out training results
+# Print out the results
 LogRes.results.table
 cat('The testing set accuracy is: ',LogRes.results.accuracy,'\n')
 cat('The testing set precision is: ',LogRes.results.precision,'\n')
@@ -760,6 +764,7 @@ cat('The testing set sensitivity is: ',LogRes.results.sensitivity,'\n')
 cat('The testing set specificity is: ',LogRes.results.specificity,'\n')
 cat('The testing set balance accuracy is: ',LogRes.results.balanced.accuracy,'\n')
 cat('The testing set f1 is: ',LogRes.results.f1,'\n')
+
 
 # store results of logres in overall.results.df
 overall.results.df['accuracy','LogRes'] <- LogRes.results.accuracy
