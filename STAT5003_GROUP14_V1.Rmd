@@ -623,9 +623,9 @@ max_row_index <- which.max(rf.results.df$sensitivity)
 ntree_max <- rf.results.df$ntree[max_row_index]
 mtry_max <- rf.results.df$mtry[max_row_index]
 max_sensitivity <- rf.results.df$sensitivity[max_row_index]
-max_accuracy <- rf.results.df$accuracy[max_sensitivity_index]
-max_precision <- rf.results.df$precision[max_sensitivity_index]
-max_f1 <- rf.results.df$f1.score[max_sensitivity_index]
+max_accuracy <- rf.results.df$accuracy[max_row_index]
+max_precision <- rf.results.df$precision[max_row_index]
+max_f1 <- rf.results.df$f1.score[max_row_index]
 
 # Print the values
 cat('The RF model is optimized for maximum sensitivity, to minimize false negatives:')
@@ -793,7 +793,7 @@ test_pred <- ifelse(test_probs > 0.5, 1, 0)
 confusion_matrix_updated <- confusionMatrix(as.factor(test_pred), as.factor(test_data$debt_quality))
 
 # Extract evaluation metrics
-LogRes.results.table = confusion_matrix_updated$table
+#LogRes.results.table = confusion_matrix_updated$table
 LogRes.results.accuracy = confusion_matrix_updated$overall["Accuracy"]
 LogRes.results.precision = confusion_matrix_updated$byClass["Precision"]
 LogRes.results.sensitivity = confusion_matrix_updated$byClass["Sensitivity"]
@@ -802,13 +802,13 @@ LogRes.results.balanced.accuracy = (LogRes.results.sensitivity + LogRes.results.
 LogRes.results.f1 = confusion_matrix_updated$byClass["F1"]
 
 # Print out the results
-LogRes.results.table
-cat('The testing set accuracy is: ',LogRes.results.accuracy,'\n')
-cat('The testing set precision is: ',LogRes.results.precision,'\n')
-cat('The testing set sensitivity is: ',LogRes.results.sensitivity,'\n')
-cat('The testing set specificity is: ',LogRes.results.specificity,'\n')
-cat('The testing set balance accuracy is: ',LogRes.results.balanced.accuracy,'\n')
-cat('The testing set f1 is: ',LogRes.results.f1,'\n')
+#LogRes.results.table
+#cat('The testing set accuracy is: ',LogRes.results.accuracy,'\n')
+#cat('The testing set precision is: ',LogRes.results.precision,'\n')
+#cat('The testing set sensitivity is: ',LogRes.results.sensitivity,'\n')
+#cat('The testing set specificity is: ',LogRes.results.specificity,'\n')
+#cat('The testing set balance accuracy is: ',LogRes.results.balanced.accuracy,'\n')
+#cat('The testing set f1 is: ',LogRes.results.f1,'\n')
 
 
 # store results of logres in overall.results.df
