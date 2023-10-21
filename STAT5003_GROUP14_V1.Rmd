@@ -989,10 +989,15 @@ overall.results.df['f1.score','ADA'] <- best_model_params$f1.score
 
 
 **5. Support vector machine:** <br>
-SVM is a powerful supervised algorithm that can perform well in handling complex datasets with non-linear decision boundaries by utilizing kernel functions to transform the data into a high-dimensional space.
 
++ **Description:** SVM is a powerful supervised algorithm that can perform well in handling complex datasets with non-linear decision boundaries by utilizing kernel functions to transform the data into a high-dimensional space. 
 
-```{r}
++ **Design:** (i) we applied min-max scaling and one-hot-encoding to the dataset, 
+(ii) Principal Component Analysis (PCA) is a commonly used data preprocessing technique, especially when dealing with high-dimensional data algorithms like Support Vector Machines (SVM). we use PCA to preprocess both train and test data.
+(iii) the grid search technique was applied on **'class.weights'** to find the **best accuracy score**,
+(iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by accuracy score shown below:**
+
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #create train and test data
 
 processed_data <- preprocess_data(application_clean, target_col='debt_quality')
@@ -1005,56 +1010,105 @@ processed_data.test <- processed_data[-inTrain,]
 
 ```
 
-```{r}
-#libraries
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+
 library(e1071)
-library(MASS)
-library(mlr)
 
 # Apply grid search for SVM
-grid_search_svm <- function(trainset) {
-  col_names <- colnames(trainset)
-  fixed_col_names <- make.names(col_names, unique = TRUE)
-  colnames(trainset) <- fixed_col_names
-  task <- makeClassifTask(data = trainset, target = "debt_quality")
-
-  # creat params
-  ps <- makeParamSet(
-    makeDiscreteParam("cost", values = c(0.01, 0.1, 1)),
-    makeDiscreteParam("gamma", values = c(0.001, 0.01, 0.1))
-  )
-
-  # create a makelearner
-  learner <- makeLearner("classif.svm", predict.type = "prob")
-
-  # run grid search
-  res <- tuneParams(learner, task, resampling = cv3, par.set = ps, control = makeTuneControlGrid())
-
-  # take a long time to search
-  return(res$x)
-}
+grid_search_svm <- function(train_data, test_data, class_weights) {
+  #initiate results grid
+  svm.results.df <- data.frame(
+                         class.weight = numeric(),
+                         accuracy = numeric(),
+                         precision = numeric(),
+                         sensitivity = numeric(),
+                         specificity = numeric(),
+                         balanced.accuracy = numeric(),
+                         f1.score = numeric(),
+                         true.positive = integer(),
+                         true.negative = integer(),
+                         false.positive = integer(),
+                         false.negative = integer()
+                         )
+  for(class_weight in class_weights) {
+    svm.model <- svm(debt_quality ~ ., data = train_data, kernel = "radial", class.weights = class_weight)
+    svm.predict <- predict(svm.model, test_data) 
+    svm.cm <- confusionMatrix(svm.predict, reference = test_data$debt_quality)
+    
+    #add result to dataframe
+    svm.results.df <- rbind(svm.results.df , data.frame(class.weight = class_weight,
+                                              accuracy = svm.cm$overall['Accuracy'],
+                                              precision = svm.cm$byClass['Precision'],
+                                              sensitivity = svm.cm$byClass['Sensitivity'],
+                                              specificity = svm.cm$byClass['Specificity'],
+                                              balanced.accuracy = (svm.cm$byClass['Sensitivity'] + svm.cm$byClass['Specificity']) /2,
+                                              f1.score = 2 * svm.cm$byClass['Precision'] * svm.cm$byClass['Sensitivity'] / (svm.cm$byClass['Precision'] + svm.cm$byClass['Sensitivity']),
+                                              true.positive = svm.cm$table[2,2],
+                                              true.negative = svm.cm$table[1,1],
+                                              false.positive = svm.cm$table[1,2],
+                                              false.negative = svm.cm$table[2,1]))
+  }
+  return(svm.results.df)
+} 
 
 
 ```
 
-```{r}
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #Utilize feature selection techniques
 
 #Use pca for selecting features
-select_data <- preProcess(processed_data.train, method = "pca", pcaComp = 10)
-train_data_pca <- predict(select_data, processed_data.train)
+select_data <- preProcess(processed_data.train, method = "pca", pcaComp = 30)
+
+#Desperate data for grid search
+set.seed(5003)
+inTrain <- createDataPartition(processed_data.train[['debt_quality']],p=0.8)[[1]]
+processed_data.train.set <- processed_data.train[inTrain,]
+processed_data.train.test <- processed_data.train[-inTrain,]
+
+train_data_pca <- predict(select_data, processed_data.train.set)
+train_predict_data_pca <- predict(select_data, processed_data.train.test)
+
+train_data_pca_full <- predict(select_data, processed_data.train)
 test_data_pca <- predict(select_data, processed_data.test)
-#Use grid search to tune params
-tuned_params <- grid_search_svm(train_data_pca)
-pca.svm.model <- svm(debt_quality ~ ., data = train_data_pca, kernel = "radial", cost = tuned_params[0], gamma = tuned_params[1])
+
+#Set class_weights set
+class_weights = list(c("0" = 1, "1" = 2),  c("0" = 1, "1" = 3), c("0" = 1, "1" = 4))
+
+#Use grid search to find the appropriate class weight parameters
+svm.result.df <- grid_search_svm(train_data_pca, train_predict_data_pca, class_weights) 
 
 ```
 
-```{r}
+Best model parameters and plots of results shown below:
+
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+#plot gridsearch results
+svm.accuracy.plot <- ggplot(svm.result.df, aes(x = class.weight, y = accuracy)) +
+  geom_line() +
+  labs(x = "class_weight", y = "accuracy") +
+  ggtitle('Accuracy') +
+  theme_minimal()
+
+svm.sensitivity.plot <- ggplot(svm.result.df, aes(x = class.weight, y = sensitivity)) +
+  geom_line() +
+  labs(x = "class_weight", y = "sensitivity") +
+  ggtitle('Sensitivity') +
+  theme_minimal()
+
+grid.arrange(svm.accuracy.plot, svm.sensitivity.plot, ncol = 2)
+```
+
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+
+max_row_index <- which.max(svm.result.df$sensitivity)
+class_weight = class_weights[[max_row_index]]
+# Use the appropriate params to create model
+pca.svm.model <- svm(debt_quality ~ ., data = train_data_pca_full, kernel = "radial", class.weights = class_weight)
 
 # Predict on the test data set using pca
 pca.svm.predictions <- predict(pca.svm.model, test_data_pca)
-confusion_matrix_pca <- confusionMatrix(pca.svm.predictions, reference = test_data_pca$debt_quality)
+confusion_matrix_pca <- confusionMatrix(pca.svm.predictions, reference =  test_data_pca$debt_quality)
 
 # Print out training results
 confusion_matrix_pca$table
@@ -1071,6 +1125,7 @@ overall.results.df['balanced.accuracy', 'SVM'] <- (confusion_matrix_pca$byClass[
 overall.results.df['f1.score', 'SVM'] <- 2*(confusion_matrix_pca$byClass['Precision'] * confusion_matrix_pca$byClass['Sensitivity'])/((confusion_matrix_pca$byClass['Precision'] + confusion_matrix_pca$byClass['Sensitivity']))
 
 ```
+
 
 
 ### Classification performance evaluation
