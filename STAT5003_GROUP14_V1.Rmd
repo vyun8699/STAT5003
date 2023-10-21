@@ -20,6 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #libraries
 library(readr)
 library(dplyr)
+library(tidyr)
 library(ggplot2)
 library(gridExtra)
 library(scales)
@@ -32,6 +33,9 @@ library(MLmetrics)
 library(ggrepel)
 library(scales)
 library(glmnet)
+library(pROC)
+library(rpart)
+library(ada)
 ```
 
 ### Problem overview
@@ -511,7 +515,7 @@ apply_smote <- function(dataframe, target_col){
 # create empty dataframe to store results
 
 # Specify column names
-col_names <- c("RF", "LogRes", "SVM","LDA")
+col_names <- c("RF", "LogRes", "LDA", "AdaBoost", "SVM")
 
 # Specify row names (index)
 row_names <- c("accuracy","precision","sensitivity","specificity","balanced.accuracy","f1.score" )
@@ -836,7 +840,116 @@ overall.results.df['f1.score', 'LDA'] <-2*(cm_best$byClass['Precision'] * cm_bes
 ```
 As you can see , the best model has been chosen after cross validating over five runs, to ensure that the best and most robust model is chosen. 
 
-**4. Support vector machine:** <br>
+**4. AdaBoost:** <br>
+Ada is an ensemble learning algorithm that builds a strong classifier by combining multiple weak learners, in this case decision trees. Ada works by focusing on instances of the dataset that are most difficult to classify by adaptively adjusting weights during successive training rounds.
+
+```{r}
+
+#apply Upsampling to training data to balance class weights
+upSampled_data <- upSample(x = processed_data.train[, -which(names(processed_data.train) == 'debt_quality')], y = processed_data.train$debt_quality)
+names(upSampled_data)[names(upSampled_data) == "Class"] <- "debt_quality"
+
+#initiate results grid
+ada_results.df <- data.frame(loss = character(), 
+                         maxdepth = integer(),
+                         iter = integer(), 
+                         bal = character(),
+                         accuracy = numeric(),
+                         precision = numeric(),
+                         sensitivity = numeric(),
+                         specificity = numeric(),
+                         balanced.accuracy = numeric(),
+                         f1.score = numeric(),
+                         true.positive = integer(),
+                         true.negative = integer(),
+                         false.positive = integer(),
+                         false.negative = integer()
+                         )
+
+#hyperparameter grid
+iter_values <- c(30, 60)
+loss_values <- c("exponential", "huber", "gentle")
+maxdepth_values <- c(1, 5)
+balance_values <- c("smote", "upSample")
+
+#grid search loop
+for (i in iter_values) {
+  for (l in loss_values) {
+    for (d in maxdepth_values){
+      for (b in balance_values){
+        
+        #set 'maxdepth' for the 'rpart' decision trees
+        control_rpart <- rpart.control(maxdepth = d)
+        
+        #apply class balancing of either upSample or SMOTE
+        if(b == "upSample"){
+          balanced_data <- upSampled_data
+        }else{
+          balanced_data <- smote_processed_data
+        }
+        
+        #model and validation
+        ada_model <- ada(debt_quality ~ ., data = balanced_data, iter = i, loss = l, control = control_rpart)
+        ada_val <- predict(ada_model, processed_data.val[, -which(names(processed_data.val) == 'debt_quality')])
+        ada_cm <- confusionMatrix(ada_val, actual.val)
+
+        #add results to the dataframe
+        ada_results.df <- rbind(ada_results.df, data.frame(loss = l, 
+                                                         maxdepth = d, 
+                                                         iter = i,
+                                                         bal = b,
+                                                         accuracy = ada_cm$overall['Accuracy'],
+                                                         precision = ada_cm$byClass['Precision'],
+                                                         sensitivity = ada_cm$byClass['Sensitivity'],
+                                                         specificity = ada_cm$byClass['Specificity'],
+                                                         balanced.accuracy = (ada_cm$byClass['Sensitivity'] + ada_cm$byClass['Specificity']) /2,
+                                                         f1.score = 2 * ada_cm$byClass['Precision'] * ada_cm$byClass['Sensitivity'] / (ada_cm$byClass['Precision'] + ada_cm$byClass['Sensitivity']),
+                                                         true.positive = ada_cm$table[2,2],
+                                                         true.negative = ada_cm$table[1,1],
+                                                         false.positive = ada_cm$table[1,2],
+                                                         false.negative = ada_cm$table[2,1]))
+      }
+    }
+  }
+}
+
+```
+
+```{r}
+
+tidy_results <- ada_results.df %>%
+  gather(key = "metric", value = "value", accuracy, precision, sensitivity, specificity, balanced.accuracy, f1.score) %>%
+  filter(bal %in% c("smote", "upSample"))
+
+#visualizing the effect of class balancing techniques on results
+ggplot(tidy_results, aes(fill=bal, y=value, x=metric)) + 
+  geom_bar(position="dodge", stat="identity") +
+  labs(y = "Metric Value", x = "Performance Metric", title = "Comparison of Class Balancing Techniques", fill = "Method") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+```{r}
+
+#ada_results.df
+
+#Find params with best balanced.accuracy
+sorted_results <- ada_results.df[order(-ada_results.df$balanced.accuracy), ]
+best_model_params <- sorted_results[1, ] 
+
+#store results of best AdaBoost model in the overall.results.df
+overall.results.df['accuracy','ADA'] <- best_model_params$accuracy
+overall.results.df['precision','ADA'] <- best_model_params$precision
+overall.results.df['sensitivity','ADA'] <- best_model_params$sensitivity
+overall.results.df['specificity','ADA'] <- best_model_params$specificity
+overall.results.df['balanced.accuracy','ADA'] <- best_model_params$balanced.accuracy
+overall.results.df['f1.score','ADA'] <- best_model_params$f1.score
+
+```
+
+
+**5. Support vector machine:** <br>
 SVM is a powerful supervised algorithm that can perform well in handling complex datasets with non-linear decision boundaries by utilizing kernel functions to transform the data into a high-dimensional space.
 
 
