@@ -773,11 +773,11 @@ LogRes.train_results.accuracy = confusion_matrix_train$overall["Accuracy"]
 LogRes.train_results.precision = confusion_matrix_train$byClass["Precision"]
 LogRes.train_results.sensitivity = confusion_matrix_train$byClass["Sensitivity"]
 LogRes.train_results.specificity = confusion_matrix_train$byClass["Specificity"]
-LogRes.train_results.balanced.accuracy = (LogRes.results.sensitivity + LogRes.results.specificity)/2
-LogRes.train_results.f1 = confusion_matrix_updated$byClass["F1"]
+LogRes.train_results.balanced.accuracy = (LogRes.train_results.sensitivity + LogRes.train_results.specificity)/2
+LogRes.train_results.f1 = confusion_matrix_train$byClass["F1"]
 
 # Print out the training results
-LogRes.train_results.table
+#LogRes.train_results.table
 cat('The training set accuracy is: ',LogRes.train_results.accuracy,'\n')
 cat('The training set precision is: ',LogRes.train_results.precision,'\n')
 cat('The training set sensitivity is: ',LogRes.train_results.sensitivity,'\n')
@@ -978,12 +978,12 @@ sorted_results <- ada_results.df[order(-ada_results.df$balanced.accuracy), ]
 best_model_params <- sorted_results[1, ] 
 
 #store results of best AdaBoost model in the overall.results.df
-overall.results.df['accuracy','ADA'] <- best_model_params$accuracy
-overall.results.df['precision','ADA'] <- best_model_params$precision
-overall.results.df['sensitivity','ADA'] <- best_model_params$sensitivity
-overall.results.df['specificity','ADA'] <- best_model_params$specificity
-overall.results.df['balanced.accuracy','ADA'] <- best_model_params$balanced.accuracy
-overall.results.df['f1.score','ADA'] <- best_model_params$f1.score
+overall.results.df['accuracy','AdaBoost'] <- best_model_params$accuracy
+overall.results.df['precision','AdaBoost'] <- best_model_params$precision
+overall.results.df['sensitivity','AdaBoost'] <- best_model_params$sensitivity
+overall.results.df['specificity','AdaBoost'] <- best_model_params$specificity
+overall.results.df['balanced.accuracy','AdaBoost'] <- best_model_params$balanced.accuracy
+overall.results.df['f1.score','AdaBoost'] <- best_model_params$f1.score
 
 ```
 
@@ -1133,12 +1133,16 @@ overall.results.df['f1.score', 'SVM'] <- 2*(confusion_matrix_pca$byClass['Precis
 We measure model performance through **precision** (TP / (TP+FP)) e.g., out of all customers predicted as bad debtors, how many are really bad debtors? and **sensitivity** (TP/(TP+FN)) e.g., out of all actual bad debtors, how many were actually flagged as bad debtors by the model?. Both of these measures are important as we want to (i) maximize the model's ability to predict true positives, and (ii) minimize intances of false positive and false negative. As displayed below, RF significantly perform better on both metrics compared to others:
 
 ```{r}
-overall.results.df
+rounded.results.df <- round(overall.results.df,3)
+rounded.results.df
 ```
+
+
+
 
 ### Conclusion
 
-We recommend Random Forest (RF) for this analysis, though it still has its limitations, as shown by its specificity score (0.58, caused by moderately high false positives). This implies that the RF model is 'too strict' : where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
+We recommend Random Forest (RF) for this analysis, though it still has its limitations, as shown by its specificity score (0.41, caused by moderately high false positives). This implies that the RF model is 'too strict' : where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
 
 To improve model performance, additional data may be needed (e.g. higher volume of customer data and expanding features collected at application). Other useful features that may be collected include information on wealth level, history of indebtedness at other financial institutions, criminal records,  etc. If we had a greater amount of resources, perhaps a deep learning model could have been trained on a significantl large enough dataset to ensure better results, and also ensure that it 'learns' from the data such that it can handle outliers on its own and be used in multiple use cases and more extensively. 
 
