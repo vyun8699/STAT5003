@@ -990,7 +990,7 @@ overall.results.df['f1.score','ADA'] <- best_model_params$f1.score
 
 **5. Support vector machine:** <br>
 
-+ **Description:** SVM is a powerful supervised algorithm that can perform well in handling complex datasets with non-linear decision boundaries by utilizing kernel functions to transform the data into a high-dimensional space. 
++ **Description:** Support Vector Machines (SVM) are a set of supervised learning methods used for classification, regression, and outliers detection. Given a set of training examples, each marked as belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples to one category or the other. It is a representation of the examples as points in space, mapped so that the examples of the separate categories are divided by a clear gap that is as wide as possible.
 
 + **Design:** (i) we applied min-max scaling and one-hot-encoding to the dataset, 
 (ii) Principal Component Analysis (PCA) is a commonly used data preprocessing technique, especially when dealing with high-dimensional data algorithms like Support Vector Machines (SVM). we use PCA to preprocess both train and test data.
