@@ -755,6 +755,31 @@ fit <- glmnet(as.matrix(train_data[, -ncol(train_data)]), # predictors
               lambda = best_lambda, 
               family = "binomial")
 
+# # Predict using the best model on the training data
+train_probs <- predict(fit, newx = as.matrix(train_data[, -ncol(train_data)]), type = "response")
+train_pred <- ifelse(train_probs > 0.5, 1, 0)
+
+# Evaluate the model's performance on the training data using confusionMatrix
+confusion_matrix_train <- confusionMatrix(as.factor(train_pred), as.factor(train_data$debt_quality))
+
+# Extract evaluation metrics
+LogRes.train_results.table = confusion_matrix_train$table
+LogRes.train_results.accuracy = confusion_matrix_train$overall["Accuracy"]
+LogRes.train_results.precision = confusion_matrix_train$byClass["Precision"]
+LogRes.train_results.sensitivity = confusion_matrix_train$byClass["Sensitivity"]
+LogRes.train_results.specificity = confusion_matrix_train$byClass["Specificity"]
+LogRes.train_results.balanced.accuracy = (LogRes.results.sensitivity + LogRes.results.specificity)/2
+LogRes.train_results.f1 = confusion_matrix_updated$byClass["F1"]
+
+# Print out the training results
+LogRes.train_results.table
+cat('The training set accuracy is: ',LogRes.train_results.accuracy,'\n')
+cat('The training set precision is: ',LogRes.train_results.precision,'\n')
+cat('The training set sensitivity is: ',LogRes.train_results.sensitivity,'\n')
+cat('The training set specificity is: ',LogRes.train_results.specificity,'\n')
+cat('The training set balance accuracy is: ',LogRes.train_results.balanced.accuracy,'\n')
+cat('The training set f1 is: ',LogRes.train_results.f1,'\n')
+
 # Predict using the best model on the test data
 test_probs <- predict(fit, newx = as.matrix(test_data[, -ncol(test_data)]), type = "response")
 test_pred <- ifelse(test_probs > 0.5, 1, 0)
