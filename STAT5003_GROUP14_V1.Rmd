@@ -13,7 +13,7 @@ text-align: justify}
 </style>
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, fig.height = 4, fig.width = 8, fig.align = "center", warning = FALSE, results='hold',message=FALSE)
 ```
 
 ```{r, include = FALSE}
@@ -40,7 +40,7 @@ The goal of this exercise is to define 'bad debtors' based on their credit histo
  
 ### Dataset description
 
-```{r, message=FALSE, warning=FALSE, results='hold'}
+```{r}
 # load dataset(s)
 # source: https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction
 
@@ -103,7 +103,7 @@ Key challenges that needs to be solved to analyze this dataset include:
 **1. Screening the dataset for nulls, blanks, and duplicates:**<br>
 No nulls were found. Cells in **occupation_type** were blank (" ") for income_type = "pensioners" and were filled in accordingly. Remaining blank cells were filled with "unknown". Rows with duplicated ID numbers in application_data were dropped.
 
-```{r, warning=FALSE, results='hold'}
+```{r}
 # check and remove NAs --> no NAs found
 na_rows_application <- application_record[!complete.cases(application_record), ]
 na_rows_credit <- credit_record[!complete.cases(credit_record), ]
@@ -145,7 +145,7 @@ cat("Number of duplicate IDs dropped:", nrow_dup,"rows", "\n")
 **2. Trimming the dataset to only include relevant IDs:**<br>
 Only accounts with 20+ month of transaction history were included in the final dataset to allow enough time to pass for each customers to prove their long-term credit quality.
 
-```{r, results='hold'}
+```{r}
 # Trim both dataset by common IDs
 common_ids <- intersect(application_record$ID, credit_record$ID)
 filtered_application_records <- application_record %>% filter(ID %in% common_ids) #36k x 18 fetures
@@ -177,7 +177,7 @@ cat("Dimension of trimmed credit_record:", dim(length_filtered_credit_records)[1
 **3. Understanding the distribution of classes:** <br>
 The charts below show the delinquency rate for each bad debt category - inclusive of categories after it (e.g., those with worse credit performance). For example, debtors classified as ‘0-29 days past due’ is inclusive of other debtors with 30+ days past due all the way to write offs. From this chart, we decided to focus on 30+ days delinquency as our definition of ‘bad debt’ since ‘0-29 days’ is too common and could very well be an honest mistake by the customer instead of inability to service debt.
 
-```{r, warning = FALSE, results='hold'}
+```{r}
 # currently, STATUS is filled with the following values:
     # X : No loan for the month
     # C : paid off for the month
@@ -228,7 +228,7 @@ bar_plot <- ggplot(df, aes(x = debt_category)) +
   
 line_plot <- ggplot(df, aes(x = debt_category)) +
   geom_line(aes(y = proportion, group = 1), color = 'red', size = 1) +
-  geom_text(aes(y = proportion, label = percent(proportion, accuracy = 0.1)), vjust = -0.5, color = 'red') +
+  geom_text(aes(y = proportion, label = percent(proportion, accuracy = 0.1)), vjust = -.1, color = 'red') +
   labs(title = 'Bad debtors (% total)', x = 'Category', y = 'Value') +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
@@ -240,7 +240,7 @@ grid.arrange(bar_plot, line_plot, ncol = 2)
 
 The team identified and added in the length of customer relationship as a potentialy useful feature. The team also created ‘debt_quality’ qualifiers and appended it to **application_record**. Value of ‘0’ for non-problematic debtors, ‘1’ for debtors with 30+ days past due. The team opted to define classes this way as higher classes (e.g. those with longer past dues) have very low counts which can further exacerbate the data imbalance or produce spurious relationships. 
 
-```{r, message=FALSE, warning=FALSE, results='hold'}
+```{r}
 # start a new copy of the trimmed application dataset 
 application_clean <- length_filtered_application_records
 
@@ -272,7 +272,7 @@ debt_quality_table
 
 The charts below show composition of bad debt (by count) and income level of each occupation type. We note that some occupancy types carry higher bad debt rates and outliers.
   
-```{r, results ='hold', warning = FALSE, fig.show='hold', width= "50%" }
+```{r }
 # Count bad debt by occupation type, descending order
 debt_count <- application_clean %>% 
   filter(debt_quality >0) %>% 
@@ -315,7 +315,7 @@ print(box_plot)
 + 'days_age' and 'days_employed' transformed into 'age_years' and 'employment_years'. 
 + 'children_count' was cleaned for outliers (2 rows removed, negligible impact). 
 
-```{r, warning = FALSE, results='hold', fig.show='hold'}
+```{r}
 # Plot 1: correlation before cleaning
 application_data_numerical <- application_clean %>% select_if(is.numeric)
 application_data_numerical$ID <- NULL
@@ -433,7 +433,7 @@ grid.arrange(corr_1_plot,
 
 + **Min-max scaling:** applied to numerical data (excluding the target) to remove bias from large values. 
 + **One-hot-encode:** applied to categorical data (excluding the target) to create binary representation of each categorical value. This is done as some machine learning models require numerical input. 
-+ **Synthetic Minority Over-sampling Technique (SMOTE):** applied to prevent bias towards majority class due to data imbalance. SMOTE works by creating synthetic data points between randomly-chosen k-nearest neighbor at random distances in the feature space. In practice, SMOTE should only be used on <mark> training data</mark> to prevent leakage. 
++ **Synthetic Minority Over-sampling Technique (SMOTE):** applied to the training set to prevent bias towards majority class due to data imbalance. SMOTE works by creating synthetic data points between randomly-chosen k-nearest neighbor at random distances in the feature space. In practice, SMOTE should only be used on <mark> training data</mark> to prevent leakage. 
 
 ```{r}
 # PRE PROCESSING FUNCTIONS
@@ -527,9 +527,12 @@ colnames(overall.results.df) <- col_names
 ```
 
 **1. Random forest:**<br> 
-Random forest is an ensemble method which combines multiple decision trees to create predictions. Random forest is known for its robustness against overfitting as it takes random features in each of the individual decision trees and takes an average/vote of these trees for a combined result. Score charts and parameters for best performance shown below:
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
++ **Description:** Random forest is an ensemble method which combines multiple decision trees to create predictions. Random forest is known for its robustness against overfitting as it takes random features in each of the individual decision trees and takes an average/vote of these trees for a combined result. 
+
++ **Design:** (i) we applied min-max scaling, one-hot-encoding and SMOTE to the dataset, (ii)  the grid search technique was applied on **'ntree'** and **'mtry'** to find the **best sensitivity score (to minimise false negatives)**, (iii) we identified most important features to understand what drives bad debt, and lastly (iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by sensitivity score shown below:**
+
+```{r}
 #PRE-PROCESSING
 
 # 1. Apply minmax and one hot encode to data
@@ -580,7 +583,7 @@ rf.results.df <- data.frame(ntree = integer(),
                          )
 
 #hyperparameter grid
-ntree_vals <- c(500,700,900,1100,1300) 
+ntree_vals <- c(700,900,1100,1300) 
 mtry_vals <- c(6,7,8) 
 
 #grid search loop
@@ -611,37 +614,43 @@ rownames(rf.results.df) <- NULL
 
 #rf.results.df
 
+# Find index of max sensitivity and get values of the associated ntree and mtry
+max_row_index <- which.max(rf.results.df$sensitivity)
+ntree_max <- rf.results.df$ntree[max_row_index]
+mtry_max <- rf.results.df$mtry[max_row_index]
+max_sensitivity <- rf.results.df$sensitivity[max_sensitivity_index]
+max_accuracy <- rf.results.df$accuracy[max_sensitivity_index]
+max_precision <- rf.results.df$precision[max_sensitivity_index]
+max_f1 <- rf.results.df$f1.score[max_sensitivity_index]
+
+# Print the values
+cat('The RF model is optimized for maximum sensitivity, to minimize false negatives:')
+cat("Maximum sensitivity on training set:", rf.results.df$sensitivity[max_row_index], "with the following parameters:\n")
+cat("- ntree: ", ntree_max,"mtry: ",mtry_max,"\n")
+```
++ **sensitivity** and **precision** score plots shown below. We prioritized maximizing sensitivity score to keep false negatives low. This is to ensure bad debtors are properly identified as the cost of not discovering bad debtors is much higher than misclassifying good debtors as bad debtors.
+
+```{r}
 #plot gridsearch results
 rf.precision.plot <- ggplot(rf.results.df, aes(x = ntree, y = precision, color = factor(mtry))) +
   geom_line() +
   labs(x = "ntree", y = "precision", color = "mtry") +
   scale_color_discrete(name = "mtry") +
-  ggtitle('Precision') +
+  ggtitle('Precision = TP/(TP+FP)') +
   theme_minimal()
 
 rf.sensitivity.plot <- ggplot(rf.results.df, aes(x = ntree, y = sensitivity, color = factor(mtry))) +
   geom_line() +
   labs(x = "ntree", y = "sensitivity", color = "mtry") +
   scale_color_discrete(name = "mtry") +
-  ggtitle('Sensitivity') +
+  ggtitle('Sensitivity = TP/(TP+FN)') +
   theme_minimal()
 
-grid.arrange(rf.precision.plot, rf.sensitivity.plot, ncol = 2)
-
-# Find index of max sensitivity and get values of the associated ntree and mtry
-max_row_index <- which.max(rf.results.df$sensitivity)
-ntree_max <- rf.results.df$ntree[max_row_index]
-mtry_max <- rf.results.df$mtry[max_row_index]
-
-# Print the values
-cat('The RF model is optimized for maximum sensitivity, to minimize false negatives:')
-cat("- Maximum sensitivity on training set:", rf.results.df$sensitivity[max_row_index], "\n")
-cat("- ntree corresponding to maximum balanced accuracy:", ntree_max, "\n")
-cat("- mtry corresponding to maximum balanced accuracy:", mtry_max, "\n")
-
+grid.arrange(rf.sensitivity.plot, rf.precision.plot, ncol = 2)
 ```
 
-Top-10 most important features (by Gini impurity)  shown below. We can see that 'relationship_length', 'age_years', 'income_total_log', and 'employment_years' are the key drivers to prediction outcome. 
+
++ Top-10 most important features (by Gini impurity)  shown below. We can see that 'relationship_length', 'age_years', 'income_total_log', and 'employment_years' are the key drivers to prediction outcome. 
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #random forest test score
@@ -667,7 +676,7 @@ overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.c
 **2. Logistic regression:**<br>
 
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 # Processing variables, create dummy variables, separate categorical variables and numerical variables.
 target_data <- application_clean %>% select( 'debt_quality' )
 tmpdata <- application_clean %>% select(- 'debt_quality' ) 
@@ -793,7 +802,7 @@ ggplot(results, aes(x = lambda, y = Accuracy, color = as.factor(alpha))) +
 
 **3. linear discriminant analysis:** <br>
 LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. The key thing to note about this method is that unlike other techniques, atleast in R, it does not require any hyperparameter tuning, since the  lda() function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. All the preprocessing necessary for LDA has already been done under Random Forest, so the same data will be used.  
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 
 set.seed(14)
 
@@ -840,7 +849,7 @@ As you can see , the best model has been chosen after cross validating over five
 SVM is a powerful supervised algorithm that can perform well in handling complex datasets with non-linear decision boundaries by utilizing kernel functions to transform the data into a high-dimensional space.
 
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 #create train and test data
 
 processed_data <- preprocess_data(application_clean, target_col='debt_quality')
@@ -853,7 +862,7 @@ processed_data.test <- processed_data[-inTrain,]
 
 ```
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 #libraries
 library(e1071)
 library(MASS)
@@ -885,7 +894,7 @@ grid_search_svm <- function(trainset) {
 
 ```
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 #Utilize feature selection techniques
 
 #Use pca for selecting features
@@ -898,7 +907,7 @@ pca.svm.model <- svm(debt_quality ~ ., data = train_data_pca, kernel = "radial",
 
 ```
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 
 # Predict on the test data set using pca
 pca.svm.predictions <- predict(pca.svm.model, test_data_pca)
@@ -925,7 +934,7 @@ overall.results.df['f1.score', 'SVM'] <- 2*(confusion_matrix_pca$byClass['Precis
 
 We measure model performance through **precision** (TP / (TP+FP)) e.g., out of all customers predicted as bad debtors, how many are really bad debtors? and **sensitivity** (TP/(TP+FN)) e.g., out of all actual bad debtors, how many were actually flagged as bad debtors by the model?. Both of these measures are important as we want to (i) maximize the model's ability to predict true positives, and (ii) minimize intances of false positive and false negative. As displayed below, RF significantly perform better on both metrics compared to others:
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 overall.results.df
 ```
 
