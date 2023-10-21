@@ -622,7 +622,7 @@ rownames(rf.results.df) <- NULL
 max_row_index <- which.max(rf.results.df$sensitivity)
 ntree_max <- rf.results.df$ntree[max_row_index]
 mtry_max <- rf.results.df$mtry[max_row_index]
-max_sensitivity <- rf.results.df$sensitivity[max_sensitivity_index]
+max_sensitivity <- rf.results.df$sensitivity[max_row_index]
 max_accuracy <- rf.results.df$accuracy[max_sensitivity_index]
 max_precision <- rf.results.df$precision[max_sensitivity_index]
 max_f1 <- rf.results.df$f1.score[max_sensitivity_index]
@@ -631,7 +631,12 @@ max_f1 <- rf.results.df$f1.score[max_sensitivity_index]
 cat('The RF model is optimized for maximum sensitivity, to minimize false negatives:')
 cat("Maximum sensitivity on training set:", rf.results.df$sensitivity[max_row_index], "with the following parameters:\n")
 cat("- ntree: ", ntree_max,"mtry: ",mtry_max,"\n")
+cat('\n')
+cat('Accuracy: ', max_accuracy)
+cat('Precision: ', max_precision)
+cat('f1 score: ', max_f1)
 ```
+
 + **sensitivity** and **precision** score plots shown below. We prioritized maximizing sensitivity score to keep false negatives low. This is to ensure bad debtors are properly identified as the cost of not discovering bad debtors is much higher than misclassifying good debtors as bad debtors.
 
 ```{r}
