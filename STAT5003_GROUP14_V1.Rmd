@@ -1167,6 +1167,6 @@ We recommend Random Forest (RF) for this analysis, though it still has its limit
 To improve model performance, additional data may be needed (e.g. higher volume of customer data and expanding features collected at application). Other useful features that may be collected include information on wealth level, history of indebtedness at other financial institutions, criminal records,  etc. If we had a greater amount of resources, perhaps a deep learning model could have been trained on a significantl large enough dataset to ensure better results, and also ensure that it 'learns' from the data such that it can handle outliers on its own and be used in multiple use cases and more extensively. 
 
 
-### References
+### Contribution Statement
 
-[.]
+All members contribute equally on all aspect of this project.
