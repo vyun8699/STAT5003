@@ -628,13 +628,16 @@ max_precision <- rf.results.df$precision[max_row_index]
 max_f1 <- rf.results.df$f1.score[max_row_index]
 
 # Print the values
-cat('The RF model is optimized for maximum sensitivity, to minimize false negatives:')
-cat("Maximum sensitivity on training set:", rf.results.df$sensitivity[max_row_index], "with the following parameters:\n")
-cat("- ntree: ", ntree_max,"mtry: ",mtry_max,"\n")
+cat('The RF model is optimized for maximum sensitivity, to minimize false negatives.\n')
 cat('\n')
-cat('Accuracy: ', max_accuracy)
-cat('Precision: ', max_precision)
-cat('f1 score: ', max_f1)
+cat("Maximum sensitivity on training set:", rf.results.df$sensitivity[max_row_index], "with the following parameters:\n")
+cat("- ntree: ", ntree_max,"\n")
+cat("- mtry: ", mtry_max,"\n")
+cat('\n')
+cat("Other training scores for the best model:\n")
+cat('- accuracy: ', max_accuracy)
+cat('- precision: ', max_precision)
+cat('- f1 score: ', max_f1)
 ```
 
 + **sensitivity** and **precision** score plots shown below. We prioritized maximizing sensitivity score to keep false negatives low. This is to ensure bad debtors are properly identified as the cost of not discovering bad debtors is much higher than misclassifying good debtors as bad debtors.
@@ -684,6 +687,9 @@ overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.c
 
 **2. Logistic regression:**<br>
 
++ **Description:** [Sylvia]
+
++ **Design:** [Sylvia]
 
 ```{r}
 # Processing variables, create dummy variables, separate categorical variables and numerical variables.
@@ -778,12 +784,13 @@ LogRes.train_results.f1 = confusion_matrix_train$byClass["F1"]
 
 # Print out the training results
 #LogRes.train_results.table
-cat('The training set accuracy is: ',LogRes.train_results.accuracy,'\n')
-cat('The training set precision is: ',LogRes.train_results.precision,'\n')
-cat('The training set sensitivity is: ',LogRes.train_results.sensitivity,'\n')
-cat('The training set specificity is: ',LogRes.train_results.specificity,'\n')
-cat('The training set balance accuracy is: ',LogRes.train_results.balanced.accuracy,'\n')
-cat('The training set f1 is: ',LogRes.train_results.f1,'\n')
+cat('Training scores for best model (by accuracy score) as follow:\n')
+cat('- accuracy: ',LogRes.train_results.accuracy,'\n')
+cat('- precision: ',LogRes.train_results.precision,'\n')
+cat('- sensitivity: ',LogRes.train_results.sensitivity,'\n')
+cat('- specificity: ',LogRes.train_results.specificity,'\n')
+cat('- balanced accuracy: ',LogRes.train_results.balanced.accuracy,'\n')
+cat('- f1: ',LogRes.train_results.f1,'\n')
 
 # Predict using the best model on the test data
 test_probs <- predict(fit, newx = as.matrix(test_data[, -ncol(test_data)]), type = "response")
@@ -820,6 +827,10 @@ overall.results.df['balanced.accuracy','LogRes'] <- LogRes.results.balanced.accu
 overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
 
 results <- grid_search$results
+```
++ Accuracy scores for different alpha and lambda values shown below:
+
+```{r}
 # Plot
 ggplot(results, aes(x = lambda, y = Accuracy, color = as.factor(alpha))) +
   geom_line(aes(group = alpha)) +
@@ -833,9 +844,12 @@ ggplot(results, aes(x = lambda, y = Accuracy, color = as.factor(alpha))) +
 ```
 
 
+**3. linear discriminant analysis (LDA):** <br>
 
-**3. linear discriminant analysis:** <br>
-LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. The key thing to note about this method is that unlike other techniques, atleast in R, it does not require any hyperparameter tuning, since the  lda() function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. All the preprocessing necessary for LDA has already been done under Random Forest, so the same data will be used.  
++ **Description:** LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. LDA does not require any hyperparameter tuning, since the  <mark>lda()</mark> function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. 
+
++ **Design:** (i) we applied min-max scaling, one-hot-encoding and SMOTE to the dataset, (ii)  <mark> lda() </mark> was run with 5 fold cross-validation, (iii) model with best accuracy score is chosen, (iv)the best model was tested against the test dataset which is presented in the 'classification performance evaluation' section. **Results shown below:**
+
 ```{r}
 
 set.seed(14)
@@ -851,13 +865,6 @@ lda_model <- train(debt_quality ~ .,
 
 # Access the accuracy values from each iteration of the cross-validation
 cv_results <- data.frame(Accuracy = lda_model$resample$Accuracy, Iteration = 1:5)
-
-# Plot the change in accuracy for each run of the cross-validation
-ggplot(cv_results, aes(x = Iteration, y = Accuracy)) +
-  geom_line() +
-  geom_point() +
-  labs(title = "Change in Accuracy for each Cross-Validation Run", x = "Iteration", y = "Accuracy") +
-  theme_minimal()
 
 # Print the results
 print(lda_model)
@@ -877,10 +884,25 @@ overall.results.df['specificity', 'LDA'] <- cm_best$byClass['Specificity']
 overall.results.df['balanced.accuracy', 'LDA'] <- (cm_best$byClass['Sensitivity'] + cm_best$byClass['Specificity']) / 2
 overall.results.df['f1.score', 'LDA'] <-2*(cm_best$byClass['Precision'] * cm_best$byClass['Sensitivity'])/((cm_best$byClass['Precision'] + cm_best$byClass['Sensitivity']))
 ```
-As you can see , the best model has been chosen after cross validating over five runs, to ensure that the best and most robust model is chosen. 
++ Accuracy scores shown below: 
+
+```{r}
+# Plot the change in accuracy for each run of the cross-validation
+ggplot(cv_results, aes(x = Iteration, y = Accuracy)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Change in Accuracy for each Cross-Validation Run", x = "Iteration", y = "Accuracy") +
+  theme_minimal()
+```
+
 
 **4. AdaBoost:** <br>
-Ada is an ensemble learning algorithm that builds a strong classifier by combining multiple weak learners, in this case decision trees. Ada works by focusing on instances of the dataset that are most difficult to classify by adaptively adjusting weights during successive training rounds.
+
++ **Description:** Ada is an ensemble learning algorithm that builds a strong classifier by combining multiple weak learners, in this case decision trees. Ada works by focusing on instances of the dataset that are most difficult to classify by adaptively adjusting weights during successive training rounds.
+
++ **Design:** [Ben]
+
++ Results shown below:
 
 ```{r}
 
@@ -992,9 +1014,7 @@ overall.results.df['f1.score','AdaBoost'] <- best_model_params$f1.score
 
 + **Description:** Support Vector Machines (SVM) are a set of supervised learning methods used for classification, regression, and outliers detection. Given a set of training examples, each marked as belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples to one category or the other. It is a representation of the examples as points in space, mapped so that the examples of the separate categories are divided by a clear gap that is as wide as possible.
 
-+ **Design:** (i) we applied min-max scaling and one-hot-encoding to the dataset, 
-(ii) Principal Component Analysis (PCA) is a commonly used data preprocessing technique, especially when dealing with high-dimensional data algorithms like Support Vector Machines (SVM). we use PCA to preprocess both train and test data.
-(iii) the grid search technique was applied on **'class.weights'** to find the **best accuracy score**,
++ **Design:** (i) we applied min-max scaling and one-hot-encoding to the dataset, (ii) Principal Component Analysis (PCA) is a commonly used data preprocessing technique, especially when dealing with high-dimensional data algorithms like Support Vector Machines (SVM). we use PCA to preprocess both train and test data, (iii) the grid search technique was applied on **'class.weights'** to find the **best accuracy score**,
 (iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by accuracy score shown below:**
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
@@ -1080,7 +1100,33 @@ svm.result.df <- grid_search_svm(train_data_pca, train_predict_data_pca, class_w
 
 ```
 
-Best model parameters and plots of results shown below:
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+
+max_row_index <- which.max(svm.result.df$sensitivity)
+class_weight = class_weights[[max_row_index]]
+# Use the appropriate params to create model
+pca.svm.model <- svm(debt_quality ~ ., data = train_data_pca_full, kernel = "radial", class.weights = class_weight)
+
+# Predict on the test data set using pca
+pca.svm.predictions <- predict(pca.svm.model, test_data_pca)
+confusion_matrix_pca <- confusionMatrix(pca.svm.predictions, reference =  test_data_pca$debt_quality)
+
+# Print out training results
+#confusion_matrix_pca$table
+cat('The testing set accuracy is: ',confusion_matrix_pca$overall["Accuracy"],'\n')
+cat("Precision:",  confusion_matrix_pca$byClass["Precision"], "\n")
+cat("Recall:",  confusion_matrix_pca$byClass["Recall"], "\n")
+cat("F1 Score:", 2 * (confusion_matrix_pca$byClass["Precision"] * confusion_matrix_pca$byClass["Recall"]) / (confusion_matrix_pca$byClass["Precision"] + confusion_matrix_pca$byClass["Recall"]), "\n")
+
+overall.results.df['accuracy', 'SVM'] <- confusion_matrix_pca$overall["Accuracy"]
+overall.results.df['sensitivity', 'SVM'] <- confusion_matrix_pca$byClass["Sensitivity"]
+overall.results.df['precision', 'SVM'] <- confusion_matrix_pca$byClass["Precision"]
+overall.results.df['specificity', 'SVM'] <- confusion_matrix_pca$byClass["Specificity"]
+overall.results.df['balanced.accuracy', 'SVM'] <- (confusion_matrix_pca$byClass["Sensitivity"] + confusion_matrix_pca$byClass["Specificity"]) / 2
+overall.results.df['f1.score', 'SVM'] <- 2*(confusion_matrix_pca$byClass['Precision'] * confusion_matrix_pca$byClass['Sensitivity'])/((confusion_matrix_pca$byClass['Precision'] + confusion_matrix_pca$byClass['Sensitivity']))
+
+```
++ Plots of results shown below:
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #plot gridsearch results
@@ -1099,45 +1145,17 @@ svm.sensitivity.plot <- ggplot(svm.result.df, aes(x = class.weight, y = sensitiv
 grid.arrange(svm.accuracy.plot, svm.sensitivity.plot, ncol = 2)
 ```
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
-
-max_row_index <- which.max(svm.result.df$sensitivity)
-class_weight = class_weights[[max_row_index]]
-# Use the appropriate params to create model
-pca.svm.model <- svm(debt_quality ~ ., data = train_data_pca_full, kernel = "radial", class.weights = class_weight)
-
-# Predict on the test data set using pca
-pca.svm.predictions <- predict(pca.svm.model, test_data_pca)
-confusion_matrix_pca <- confusionMatrix(pca.svm.predictions, reference =  test_data_pca$debt_quality)
-
-# Print out training results
-confusion_matrix_pca$table
-cat('The testing set accuracy is: ',confusion_matrix_pca$overall["Accuracy"],'\n')
-cat("Precision:",  confusion_matrix_pca$byClass["Precision"], "\n")
-cat("Recall:",  confusion_matrix_pca$byClass["Recall"], "\n")
-cat("F1 Score:", 2 * (confusion_matrix_pca$byClass["Precision"] * confusion_matrix_pca$byClass["Recall"]) / (confusion_matrix_pca$byClass["Precision"] + confusion_matrix_pca$byClass["Recall"]), "\n")
-
-overall.results.df['accuracy', 'SVM'] <- confusion_matrix_pca$overall["Accuracy"]
-overall.results.df['sensitivity', 'SVM'] <- confusion_matrix_pca$byClass["Sensitivity"]
-overall.results.df['precision', 'SVM'] <- confusion_matrix_pca$byClass["Precision"]
-overall.results.df['specificity', 'SVM'] <- confusion_matrix_pca$byClass["Specificity"]
-overall.results.df['balanced.accuracy', 'SVM'] <- (confusion_matrix_pca$byClass["Sensitivity"] + confusion_matrix_pca$byClass["Specificity"]) / 2
-overall.results.df['f1.score', 'SVM'] <- 2*(confusion_matrix_pca$byClass['Precision'] * confusion_matrix_pca$byClass['Sensitivity'])/((confusion_matrix_pca$byClass['Precision'] + confusion_matrix_pca$byClass['Sensitivity']))
-
-```
-
-
 
 ### Classification performance evaluation
 
-We measure model performance through **precision** (TP / (TP+FP)) e.g., out of all customers predicted as bad debtors, how many are really bad debtors? and **sensitivity** (TP/(TP+FN)) e.g., out of all actual bad debtors, how many were actually flagged as bad debtors by the model?. Both of these measures are important as we want to (i) maximize the model's ability to predict true positives, and (ii) minimize intances of false positive and false negative. As displayed below, RF significantly perform better on both metrics compared to others:
+We measure model performance through **precision** (TP / (TP+FP)) e.g., out of all customers predicted as bad debtors, how many are really bad debtors? and **sensitivity** (TP/(TP+FN)) e.g., out of all actual bad debtors, how many were actually flagged as bad debtors by the model?. Both of these measures are important as we want to (i) maximize the model's ability to predict true positives, and (ii) minimize intances of false positive and false negative. 
+
+**As displayed below in the test scores below, RF significantly perform better on both metrics compared to others:**
 
 ```{r}
 rounded.results.df <- round(overall.results.df,3)
 rounded.results.df
 ```
-
-
 
 
 ### Conclusion
