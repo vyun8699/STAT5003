@@ -4,6 +4,8 @@ author: "STAT5003 group project 14"
 date: "`r Sys.Date()`"
 output: 
   html_document:
+    toc: true
+    toc_float: true
     code_folding: hide
 ---
 
@@ -40,7 +42,9 @@ library(ada)
 
 ### Problem overview
 
-The goal of this exercise is to define 'bad debtors' based on their credit history and identify if a pattern or signal exists amongst credit applicants which may suggest the tendency of a certain cohort to become bad debtors. Management of bad debt is a key value driver in banking / the credit industry. Insights from this analysis may assist banks in acquiring the right customers (e.g. spend marketing budget on potential customers who are less likely to default) and decide on their credit risk management strategy to minimize loss (e.g. allow for different starting debt ceiling for different customer classes, sell off riskier customer portfolio and retain safer ones, etc). The dataset can be found [here](https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction).
++ The goal of this exercise is to define 'bad debtors' based on their credit history and identify if a pattern or signal exists amongst applicants. 
++ Management of bad debt is a key value driver in banking / the credit industry. Insights from this analysis may assist banks in acquiring the right customers and decide on their credit risk management strategy to minimize loss. Analyzing applicant profiles is a first step in understanding credit card customer's default behaviour [(Li et. al, 2019)](https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction).
++ The dataset can be found [here](https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction).
  
 ### Dataset description
 
