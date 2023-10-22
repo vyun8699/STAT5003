@@ -438,6 +438,7 @@ grid.arrange(corr_1_plot,
 + **Min-max scaling:** applied to numerical data (excluding the target) to remove bias from large values. 
 + **One-hot-encode:** applied to categorical data (excluding the target) to create binary representation of each categorical value. This is done as some machine learning models require numerical input. 
 + **Synthetic Minority Over-sampling Technique (SMOTE):** applied to the training set to prevent bias towards majority class due to data imbalance. SMOTE works by creating synthetic data points between randomly-chosen k-nearest neighbor at random distances in the feature space. In practice, SMOTE should only be used on <mark> training data</mark> to prevent leakage. 
++ **UpSampling:** applied to the training set to address significant imbalances between classes. upSample operates by increasing the number of instances of the minority class through duplication of random instances.
 
 ```{r}
 # PRE PROCESSING FUNCTIONS
@@ -900,7 +901,7 @@ ggplot(cv_results, aes(x = Iteration, y = Accuracy)) +
 
 + **Description:** Ada is an ensemble learning algorithm that builds a strong classifier by combining multiple weak learners, in this case decision trees. Ada works by focusing on instances of the dataset that are most difficult to classify by adaptively adjusting weights during successive training rounds.
 
-+ **Design:** [Ben]
++ **Design:** (i) applied mix-max scaling, one-hot encoding (ii) data was oversampled using upSample and SMOTE (iii) grid search was run on iterator, loss, maxdepth values as well as the two oversampling techniques (iv) the results, encompassing accuracy, precision, sensitivity and F1-score, were compiled into overall.results.df
 
 + Results shown below:
 
@@ -978,21 +979,6 @@ for (i in iter_values) {
 
 ```{r}
 
-tidy_results <- ada_results.df %>%
-  gather(key = "metric", value = "value", accuracy, precision, sensitivity, specificity, balanced.accuracy, f1.score) %>%
-  filter(bal %in% c("smote", "upSample"))
-
-#visualizing the effect of class balancing techniques on results
-ggplot(tidy_results, aes(fill=bal, y=value, x=metric)) + 
-  geom_bar(position="dodge", stat="identity") +
-  labs(y = "Metric Value", x = "Performance Metric", title = "Comparison of Class Balancing Techniques", fill = "Method") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-```
-
-
-```{r}
-
 #ada_results.df
 
 #Find params with best balanced.accuracy
@@ -1006,6 +992,20 @@ overall.results.df['sensitivity','AdaBoost'] <- best_model_params$sensitivity
 overall.results.df['specificity','AdaBoost'] <- best_model_params$specificity
 overall.results.df['balanced.accuracy','AdaBoost'] <- best_model_params$balanced.accuracy
 overall.results.df['f1.score','AdaBoost'] <- best_model_params$f1.score
+
+```
+
+```{r}
+
+tidy_results <- ada_results.df %>%
+  gather(key = "metric", value = "value", accuracy, precision, sensitivity, specificity, balanced.accuracy, f1.score) %>%
+  filter(bal %in% c("smote", "upSample"))
+
+#visualizing the effect of class balancing techniques on results
+ggplot(tidy_results, aes(fill=bal, y=value, x=metric)) + 
+  geom_bar(position="dodge", stat="identity") +
+  labs(y = "Metric Value", x = "Performance Metric", title = "Comparison of Class Balancing Techniques", fill = "Method") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
