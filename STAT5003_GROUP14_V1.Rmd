@@ -849,7 +849,7 @@ ggplot(results, aes(x = lambda, y = Accuracy, color = as.factor(alpha))) +
 
 + **Description:** LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. LDA does not require any hyperparameter tuning, since the  <mark>lda()</mark> function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. 
 
-+ **Design:** (i) we applied min-max scaling, one-hot-encoding and SMOTE to the dataset, (ii)  <mark> lda() </mark> was run with 5 fold cross-validation, (iii) model with best accuracy score is chosen, (iv)the best model was tested against the test dataset which is presented in the 'classification performance evaluation' section. **Results shown below:**
++ **Design:** (i) we applied min-max scaling, one-hot-encoding and SMOTE to the dataset, (ii)  <mark> lda() </mark> was run with 5 fold cross-validation, (iii) model with best accuracy score is chosen since : 1) The SMOTE pre processing done means that the classes are not too imbalanced, hence accuracy becomes a relevant metric , 2) LDA works in such a way that it uses correlation matrices to find the best results, hence accuracy is generally the more useful metric than sensitivity or precision since this mitigates a lot of the imbalance and 3) accuracy is the easiest metric to interpret and it is the most computationally efficient to calculate.   (iv)the best model was tested against the test dataset which is presented in the 'classification performance evaluation' section. **Results shown below:**
 
 ```{r}
 
@@ -867,8 +867,10 @@ lda_model <- train(debt_quality ~ .,
 # Access the accuracy values from each iteration of the cross-validation
 cv_results <- data.frame(Accuracy = lda_model$resample$Accuracy, Iteration = 1:5)
 
-# Print the results
-print(lda_model)
+# Print the accuracy on each run of the cross-validation
+for (i in 1:5) {
+  cat(paste("Accuracy on run", i, ":", cv_results$Accuracy[i], "\n"))
+}
 
 # Extract the best model
 best_lda <- lda_model$finalModel
