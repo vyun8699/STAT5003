@@ -953,21 +953,66 @@ for (i in iter_values) {
 
 ```
 
-```{r}
 
-#ada_results.df
+```{r}
 
 #Find params with best balanced.accuracy
 sorted_results <- ada_results.df[order(-ada_results.df$balanced.accuracy), ]
 best_model_params <- sorted_results[1, ] 
 
+#ada_results.df
+
+best_loss <- best_model_params$loss
+best_maxdepth <- best_model_params$maxdepth
+best_iter <- best_model_params$iter
+best_bal <- best_model_params$bal
+
+control_rpart <- rpart.control(maxdepth = best_maxdepth)
+
+max_balanced_accuracy <- best_model_params$balanced.accuracy
+max_accuracy <- best_model_params$accuracy
+max_precision <- best_model_params$precision
+max_sensitivity <- best_model_params$sensitivity # also known as recall
+max_f1 <- best_model_params$f1.score
+
+cat('The AdaBoost model is optimized for maximum balanced accuracy.\n')
+cat('\n')
+cat("Maximum balanced accuracy on validation set:", max_balanced_accuracy, "with the following parameters:\n")
+cat("- loss function: ", best_loss, "\n")
+cat("- max depth: ", best_maxdepth, "\n")
+cat("- iterations: ", best_iter, "\n")
+cat("- balancing technique: ", best_bal, "\n")
+cat('\n')
+cat("Other validation scores for the best model:\n")
+cat('- accuracy: ', max_accuracy, "\n")
+cat('- precision: ', max_precision, "\n")
+cat('- sensitivity: ', max_sensitivity, "\n")
+cat('- f1 score: ', max_f1, "\n")
+```
+
+
+```{r}
+if(best_bal == "upSample"){
+  best_balanced_data <- upSampled_data
+}else{
+  best_balanced_data <- smote_processed_data
+}
+
+
+#run the best model and predict the test data
+best_ada_model <- ada(debt_quality ~ ., data = best_balanced_data, iter = best_iter, loss = best_loss, control = control_rpart)
+
+ada_test_pred <- predict(best_ada_model, processed_data.test[, -which(names(processed_data.test) == 'debt_quality')])
+
+ada_test_results <- confusionMatrix(ada_test_pred, actual.test)
+
 #store results of best AdaBoost model in the overall.results.df
-overall.results.df['accuracy','AdaBoost'] <- best_model_params$accuracy
-overall.results.df['precision','AdaBoost'] <- best_model_params$precision
-overall.results.df['sensitivity','AdaBoost'] <- best_model_params$sensitivity
-overall.results.df['specificity','AdaBoost'] <- best_model_params$specificity
-overall.results.df['balanced.accuracy','AdaBoost'] <- best_model_params$balanced.accuracy
-overall.results.df['f1.score','AdaBoost'] <- best_model_params$f1.score
+overall.results.df['accuracy','AdaBoost'] <- ada_test_results$overall['Accuracy']
+overall.results.df['precision','AdaBoost'] <- ada_test_results$byClass['Precision']
+overall.results.df['sensitivity','AdaBoost'] <- ada_test_results$byClass['Sensitivity']
+overall.results.df['specificity','AdaBoost'] <- ada_test_results$byClass['Specificity']
+overall.results.df['balanced.accuracy','AdaBoost'] <- (ada_test_results$byClass['Sensitivity'] + ada_test_results$byClass['Specificity'])/2
+overall.results.df['f1.score','AdaBoost'] <- 2 * (ada_test_results$byClass['Precision'] * ada_test_results$byClass['Sensitivity']) / (ada_test_results$byClass['Precision'] + ada_test_results$byClass['Sensitivity'])
 
 ```
 
