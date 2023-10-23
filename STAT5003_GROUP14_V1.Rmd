@@ -15,7 +15,7 @@ text-align: justify}
 </style>
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, fig.height = 4, fig.width = 8, fig.align = "center", warning = FALSE, results='hold',message=FALSE)
+knitr::opts_chunk$set(fig.height = 4, fig.width = 8, fig.align = "center", warning = FALSE, results='hold',message=FALSE)
 ```
 
 ```{r, include = FALSE}
@@ -505,7 +505,7 @@ colnames(overall.results.df) <- col_names
 # overall.results.df['accuracy','random_forest'] <- 0.85
 ```
 
-###1. Random Forest 
+### 1. Random Forest 
 
 + **Description:** Random forest is an ensemble method which combines multiple decision trees to create predictions. Random forest is known for its robustness against overfitting as it takes random features in each of the individual decision trees and takes an average/vote of these trees for a combined result. 
 
@@ -615,6 +615,11 @@ cat('- precision: ', max_precision)
 cat('- f1 score: ', max_f1)
 ```
 
+```{r}
+rf.results.df$false.positive[max_row_index]
+```
+
+
 + **sensitivity** and **precision** score plots shown below. We prioritized maximizing sensitivity score to keep false negatives low. This is to ensure bad debtors are properly identified as the cost of not discovering bad debtors is much higher than misclassifying good debtors as bad debtors.
 
 ```{r}
@@ -660,7 +665,7 @@ overall.results.df['balanced.accuracy','RF'] <- (rf.cm.best$byClass['Sensitivity
 overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.cm.best$byClass['Sensitivity'])/((rf.cm.best$byClass['Precision'] + rf.cm.best$byClass['Sensitivity']))
 ```
 
-###2. Logistic Regression
+### 2. Logistic Regression
 
 + **Description:** [Sylvia]
 
@@ -819,7 +824,7 @@ ggplot(results, aes(x = lambda, y = Accuracy, color = as.factor(alpha))) +
 ```
 
 
-###3. linear discriminant analysis (LDA)
+### 3. linear discriminant analysis (LDA)
 
 + **Description:** LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. LDA does not require any hyperparameter tuning, since the  <mark>lda()</mark> function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. 
 
@@ -986,7 +991,7 @@ ggplot(tidy_results, aes(fill=bal, y=value, x=metric)) +
 ```
 
 
-###5. Support vector machine
+### 5. Support vector machine
 
 + **Description:** Support Vector Machines (SVM) are a set of supervised learning methods used for classification, regression, and outliers detection. Given a set of training examples, each marked as belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples to one category or the other. It is a representation of the examples as points in space, mapped so that the examples of the separate categories are divided by a clear gap that is as wide as possible.
 
@@ -1128,13 +1133,29 @@ Test results are displayed below:
 
 ```{r}
 rounded.results.df <- round(overall.results.df,3)
-rounded.results.df
-barplot(rounded.results.df$Value, names.arg = rounded.results.df$Category, xlab = "Categories", ylab = "Values", col = "blue", main = "Bar Plot of Values")
+
+# Assuming your dataframe is named rounded.results.df
+library(tibble)
+library(tidyr)
+
+# Convert row names to a new column
+rounded.results.df <- rownames_to_column(rounded.results.df, var = "Category")
+
+# Reshape the dataframe from wide to long format
+rounded.results.df_long <- gather(rounded.results.df, Method, Score, -Category)
+
+# Create the bar plot
+ggplot(rounded.results.df_long, aes(x = Category, y = Score, fill = Method)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Scores", y = "Values") +
+  ggtitle("Comparison of Scores for Different Methods") +
+  theme_minimal()
 ```
 
-**We measure model performance through precision and sensitivity:**
-+ **precision** (TP / (TP+FP)): a high precision score implies that the model performs well in differentiating true positive against false positives (e.g., out of all customers predicted as bad debtors, how many are really bad debtors?).
-+ **sensitivity** (TP/(TP+FN)): a high sensitivity score implies that the model performs well in differentiating true positive against fall negatives (e.g., out of all actual bad debtors, how many were actually flagged as bad debtors by the model?). 
+**Since our dataset is imbalanced, with class 1 accounting for only c.16% of data points, the team has chosen measures which focuses on maximizing true positives and minimizing false positives and false negatives:**
++ **precision** (TP / (TP+FP)): high precision implies low proportion of false positives. All models aside from logistic regression performed relatively well (87%+) which means they were able to correctly identify actual bad debtors without being 'too strict' whereby not too many good debtors were mistakenly flagged as bad debtors.
++ **sensitivity** (TP/(TP+FN)): high sensitivity implies low proportion of false negatives. Random forest and support vector machine scored higher (99%+) than the rest which means they were able to correctly identify almost all bad debtors in the test set. 
++ It is worth noting that all models scored lower in **specificity** (TN/(TN+FP)),  a high specificity score implies that the model performs well the model can differentiate good debtor from the rest 
 
 ```{r}
 rounded.results.df <- round(overall.results.df,3)
@@ -1142,11 +1163,15 @@ rounded.results.df
 ```
 
 
-**We recommend Random Forest (RF) for this analysis**, though it still has its limitations, as shown by its specificity score (0.41, caused by moderately high false positives). This implies that the RF model is 'too strict' : where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
+**Final model recommendation:** We recommend Random Forest (RF) for this analysis, though it still has its limitations, as shown by its specificity score (0.41, caused by moderately high false positives). This implies that the RF model is 'too strict' : where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
+
+## DISCUSSION
+
+**Conclusion:** [.]
 
 **Improvements:** To improve model performance, additional data may be needed (e.g. higher volume of customer data and expanding features collected at application). Other useful features that may be collected include information on wealth level, history of indebtedness at other financial institutions, criminal records,  etc. If we had a greater amount of resources, perhaps a deep learning model could have been trained on a significantl large enough dataset to ensure better results, and also ensure that it 'learns' from the data such that it can handle outliers on its own and be used in multiple use cases and more extensively. 
 
-## References
+## REFERENCES
 
 Li, Y., Li, Y., & Li, Y. (2019). What factors are influencing credit card customer’s default behavior in China? A study based on survival analysis. Physica A: Statistical Mechanics and Its Applications, 526, 120861. https://doi.org/10.1016/j.physa.2019.04.097
 
@@ -1154,6 +1179,6 @@ Leong, O. J., & Jayabalan, M. (2019). A Comparative Study on Credit Card Default
 
 Wang, L., Lu, W., & Malhotra, N. K. (2011). Demographics, attitude, personality and credit card features correlate with credit card debt: A view from China. Journal of Economic Psychology, 32(1), 179–193. https://doi.org/10.1016/j.joep.2010.11.006
 
-## Contribution Statement
+## CONTRIBUTION STATEMENT
 
 All members contribute equally on all aspect of this project.
