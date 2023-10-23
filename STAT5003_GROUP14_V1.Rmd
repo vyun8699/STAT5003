@@ -870,6 +870,19 @@ for (i in 1:5) {
 # Extract the best model
 best_lda <- lda_model$finalModel
 
+# Make predictions on the training set
+train.pred <- predict(best_lda, newdata = smote_processed_data[, -which(names(smote_processed_data) == 'debt_quality')])
+cm_train <- confusionMatrix(train.pred$class, smote_processed_data$debt_quality)
+
+# Print the results of the best model on the training set
+cat("Results of the best model on the training set:\n")
+cat(paste("Accuracy:", cm_train$overall['Accuracy'], "\n"))
+cat(paste("Sensitivity:", cm_train$byClass['Sensitivity'], "\n"))
+cat(paste("Precision:", cm_train$byClass['Precision'], "\n"))
+cat(paste("Specificity:", cm_train$byClass['Specificity'], "\n"))
+cat(paste("Balanced Accuracy:", (cm_train$byClass['Sensitivity'] + cm_train$byClass['Specificity']) / 2, "\n"))
+cat(paste("F1 Score:", 2*(cm_train$byClass['Precision'] * cm_train$byClass['Sensitivity'])/((cm_train$byClass['Precision'] + cm_train$byClass['Sensitivity']), "\n"))
+
 # Use the best model to make predictions on the test set
 test.pred <- predict(best_lda, newdata = processed_data.test[, -which(names(processed_data.test) == 'debt_quality')])
 cm_best <- confusionMatrix(test.pred$class, actual.test)
