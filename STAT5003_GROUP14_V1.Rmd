@@ -543,7 +543,7 @@ actual.val <- processed_data.val$debt_quality
 smote_processed_data <- apply_smote(processed_data.train,target_col='debt_quality')
 ```
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 # Model and grid search
 
 #initiate results grid
@@ -554,12 +554,7 @@ rf.results.df <- data.frame(ntree = integer(),
                          sensitivity = numeric(),
                          specificity = numeric(),
                          balanced.accuracy = numeric(),
-                         f1.score = numeric(),
-                         true.positive = integer(),
-                         true.negative = integer(),
-                         false.positive = integer(),
-                         false.negative = integer()
-                         )
+                         f1.score = numeric())
 
 #hyperparameter grid
 ntree_vals <- c(700,900,1100,1300) 
@@ -571,7 +566,7 @@ for (ntree_val in ntree_vals){
     #model and val
     rf.model <- randomForest(debt_quality~., data = smote_processed_data, ntree=ntree_val, mtry=mtry_val)
     rf.val <- predict(rf.model, processed_data.val[, -which(names(processed_data.val) == 'debt_quality')])
-    rf.cm <- confusionMatrix(rf.val, actual.val)
+    rf.cm <- confusionMatrix(rf.val, actual.val, positive="1")
     
     #add result to dataframe
     rf.results.df <- rbind(rf.results.df,data.frame(ntree = ntree_val, mtry = mtry_val,
@@ -580,11 +575,7 @@ for (ntree_val in ntree_vals){
                                               sensitivity = rf.cm$byClass['Sensitivity'],
                                               specificity = rf.cm$byClass['Specificity'],
                                               balanced.accuracy = (rf.cm$byClass['Sensitivity'] + rf.cm$byClass['Specificity']) /2,
-                                              f1.score = 2 * rf.cm$byClass['Precision'] * rf.cm$byClass['Sensitivity'] / (rf.cm$byClass['Precision'] + rf.cm$byClass['Sensitivity']),
-                                              true.positive = rf.cm$table[2,2],
-                                              true.negative = rf.cm$table[1,1],
-                                              false.positive = rf.cm$table[1,2],
-                                              false.negative = rf.cm$table[2,1]))
+                                              f1.score = 2 * rf.cm$byClass['Precision'] * rf.cm$byClass['Sensitivity'] / (rf.cm$byClass['Precision'] + rf.cm$byClass['Sensitivity'])))
   }
 }
 
@@ -594,29 +585,28 @@ rownames(rf.results.df) <- NULL
 #rf.results.df
 
 # Find index of max sensitivity and get values of the associated ntree and mtry
-max_row_index <- which.max(rf.results.df$sensitivity)
+max_row_index <- which.max(rf.results.df$accuracy)
 ntree_max <- rf.results.df$ntree[max_row_index]
 mtry_max <- rf.results.df$mtry[max_row_index]
-max_sensitivity <- rf.results.df$sensitivity[max_row_index]
-max_accuracy <- rf.results.df$accuracy[max_row_index]
-max_precision <- rf.results.df$precision[max_row_index]
-max_f1 <- rf.results.df$f1.score[max_row_index]
+best_accuracy <- rf.results.df$accuracy[max_row_index]
+best_precision <- rf.results.df$precision[max_row_index]
+best_sensitivity <- rf.results.df$sensitivity[max_row_index]
+best_specificity <- rf.results.df$specificity[max_row_index]
+best_balanced.accuracy <- rf.results.df$balanced.accuracy[max_row_index]
+best_f1.score <- rf.results.df$f1.score[max_row_index]
 
 # Print the values
-cat('The RF model is optimized for maximum sensitivity, to minimize false negatives.\n')
-cat('\n')
-cat("Maximum sensitivity on training set:", rf.results.df$sensitivity[max_row_index], "with the following parameters:\n")
+cat('Best model parameters:\n')
 cat("- ntree: ", ntree_max,"\n")
 cat("- mtry: ", mtry_max,"\n")
 cat('\n')
-cat("Other training scores for the best model:\n")
-cat('- accuracy: ', max_accuracy)
-cat('- precision: ', max_precision)
-cat('- f1 score: ', max_f1)
-```
-
-```{r}
-rf.results.df$false.positive[max_row_index]
+cat("Training scores for the best model:\n")
+cat('- accuracy: ', best_accuracy,'\n')
+cat('- precision: ', best_precision,'\n')
+cat('- sensitivity: ', best_sensitivity,'\n')
+cat('- specificity: ', best_specificity,'\n')
+cat('- balanced accuracy: ', best_balanced.accuracy,'\n')
+cat('- f1 score: ', best_f1.score,'\n')
 ```
 
 
@@ -649,7 +639,7 @@ grid.arrange(rf.sensitivity.plot, rf.precision.plot, ncol = 2)
 set.seed(1)
 
 #model
-rf.best.model <- randomForest(debt_quality ~., data = processed_data.test, ntree=ntree_max, mtry = mtry_max)
+rf.best.model <- randomForest(debt_quality ~., data = smote_processed_data, ntree=ntree_max, mtry = mtry_max)
 rf.test.pred <- predict (rf.best.model, processed_data.test[, -which(names(processed_data.test) == 'debt_quality')])
 rf.cm.best <- confusionMatrix(rf.test.pred, actual.test)
 
@@ -663,6 +653,9 @@ overall.results.df['sensitivity','RF'] <- rf.cm.best$byClass['Sensitivity']
 overall.results.df['specificity','RF'] <- rf.cm.best$byClass['Specificity']
 overall.results.df['balanced.accuracy','RF'] <- (rf.cm.best$byClass['Sensitivity'] + rf.cm.best$byClass['Specificity'])/2
 overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.cm.best$byClass['Sensitivity'])/((rf.cm.best$byClass['Precision'] + rf.cm.best$byClass['Sensitivity']))
+
+cat('confusion table:\n')
+rf.cm.best
 ```
 
 ### 2. Logistic Regression
@@ -1201,11 +1194,6 @@ ggplot(rounded.results.df_long, aes(x = Category, y = Score, fill = Method)) +
 + **precision** (TP / (TP+FP)): high precision implies low proportion of false positives. All models aside from logistic regression performed relatively well (87%+) which means they were able to correctly identify actual bad debtors without being 'too strict' whereby not too many good debtors were mistakenly flagged as bad debtors.
 + **sensitivity** (TP/(TP+FN)): high sensitivity implies low proportion of false negatives. Random forest and support vector machine scored higher (99%+) than the rest which means they were able to correctly identify almost all bad debtors in the test set. 
 + It is worth noting that all models scored lower in **specificity** (TN/(TN+FP)),  a high specificity score implies that the model performs well the model can differentiate good debtor from the rest 
-
-```{r}
-rounded.results.df <- round(overall.results.df,3)
-rounded.results.df
-```
 
 
 **Final model recommendation:** We recommend Random Forest (RF) for this analysis, though it still has its limitations, as shown by its specificity score (0.41, caused by moderately high false positives). This implies that the RF model is 'too strict' : where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
