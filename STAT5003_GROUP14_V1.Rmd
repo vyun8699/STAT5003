@@ -2,11 +2,7 @@
 title: "STAT5003_14_Credit_Card_Analysis"
 author: "STAT5003 group project 14"
 date: "`r Sys.Date()`"
-output: 
-  html_document:
-    toc: true
-    toc_float: true
-    code_folding: hide
+output: pdf_document
 ---
 
 <style>
@@ -15,7 +11,7 @@ text-align: justify}
 </style>
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(fig.height = 4, fig.width = 8, fig.align = "center", warning = FALSE, results='hold',message=FALSE)
+knitr::opts_chunk$set(echo=FALSE, fig.height = 4, fig.width = 8, fig.align = "center", warning = FALSE, results='hold',message=FALSE)
 ```
 
 ```{r, include = FALSE}
@@ -42,11 +38,11 @@ library(ada)
 
 ## OVERVIEW
 
-+ **Problem statement:** Commercial banks need to continually observe the impact of customer's work and life stability on credit card defaults, which is costly to maintain [(Li et. al., 2019)](https://www.sciencedirect.com/science/article/pii/S0378437119304662?casa_token=pA1wt2JJQ3MAAAAA:kLoYLgxVI1azrn4dzIyE06BL40ab1uXy59W5mrALNg_7AlPTkg9M_Jf21A-MU6xoamIUtEzb). [Traditional] regression functions on demographic variables and credit card features yield limited explanatory power compared to other factors such as attitude variables and personality variables  [(Wang et. al, 2011)](https://www.sciencedirect.com/science/article/abs/pii/S0167487010001327). Previous attempts at applying machine learning to classify card applicants into different credit limits has achieved acceptable results (82% predictive accuracy of credit card defaulters) [(Leong et. all., 2019)](https://www.ingentaconnect.com/contentone/asp/jctn/2019/00000016/00000008/art00083).
++ **Problem statement:** Commercial banks need to continually observe the impact of customer's work and life stability on credit card defaults, which is costly to maintain [(Li et. al., 2019)](https://www.sciencedirect.com/science/article/pii/S0378437119304662?casa_token=pA1wt2JJQ3MAAAAA:kLoYLgxVI1azrn4dzIyE06BL40ab1uXy59W5mrALNg_7AlPTkg9M_Jf21A-MU6xoamIUtEzb). [Traditional] regression functions on demographic variables and credit card features yield limited explanatory power compared to other factors such as attitude variables and personality variables  [(Wang et. al, 2011)](https://www.sciencedirect.com/science/article/abs/pii/S0167487010001327). Previous attempts at applying machine learning to classify card applicants into different credit limits has achieved acceptable results (82% predictive accuracy of credit card defaulters with neural networkst) [(Leong et. all., 2019)](https://www.ingentaconnect.com/contentone/asp/jctn/2019/00000016/00000008/art00083).
 
-+ **Goal:** The goal of this exercise is to apply machine learning methods to define 'bad debtors' based on their credit history and predict credit defaulters based on a limited set of data available at point of application. This exercise also includes 'length_of_relationship' as a factor to test it's relevancy against demographic data received at point of application. Dataset can be accessed [here](https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction). 
++ **Goal:** The goal of this exercise is to apply machine learning methods to predict potential credit defaulters based on a set of data available at point of application. The dataset can be accessed [here](https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction). 
 
-+ **The dataset is split into two files**: **credit_record** contains 46 thousand unique customers IDs which tracks their credit status overtime. Customers are classified into different loan status groups (e.g. 'paid off that month', '1-29 days past due', etc.).**application_record **  contains collected information at the initial credit card application, such as ID, gender, occupation, number of children, marital status, etc. Both files are connected by the feature **ID**.
++ **The dataset is split into two files**: **credit_record** (3 features x 1+ million observations) which tracks customer credit performance overtime and **application_record** (18 features x 438+ thousand observations) which contains collected information at the initial credit card application such as ID, gender, occupation, number of children, marital status, etc. The total data points Both files are connected by the feature **ID**.
 
 ```{r}
 # load dataset(s)
@@ -92,6 +88,8 @@ credit_record <- credit_record %>%
 ```
 
 ## FEATURE ENGINEERING
+
++ **Data analysis and cleaning:** the dataset was screened for nulls, blanks, and duplicates and further trimmed to only include IDs with 20+ months banking history. As displayed below, 88.9% of debtors has more than 0 days of delinquency which could very well be an honest mistake and not representative of their ability to service their payments. Thus we defined **30+ days of delinquency as our target feature, denoted as class 1. <mark>The resulting dataset contained 21,575 customers of which 2,895 customers (c.13%) are in class 1</mark>**.
 
 ```{r}
 # check and remove NAs --> no NAs found
@@ -189,31 +187,35 @@ for (i in seq_along(filters)) {
 }
 
 df <- data.frame(
-  debt_category = c('0-29 days past due',
-                    '30-59 days past due',
-                    '60-89 days past due',
-                    '90-119 days past due',
-                    '120-149 days past due',
+  debt_category = c('0+ days past due',
+                    '30+ days past due',
+                    '60+ days past due',
+                    '90+ days past due',
+                    '120+ days past due',
                     'bad debt / write off'),
   category_count = category_counts
 )
 
+# Create a factor with the desired order for debt_category
+df$debt_category <- factor(df$debt_category, levels = df$debt_category)
+
+#Calculate proportion to total
 df$proportion <- df$category_count / length(length_ids)
 
 # print(df) #unhash to run
 
 bar_plot <- ggplot(df, aes(x = debt_category)) +
   geom_bar(aes(y = category_count), stat = 'identity', fill = 'blue', alpha = 0.5) +
-  labs(title = 'Bad debtors (count)', x = 'Category', y = 'Value') +
+  labs(title = 'Bad debtors (count)', x = 'Category', y = 'Count') +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
 line_plot <- ggplot(df, aes(x = debt_category)) +
   geom_line(aes(y = proportion, group = 1), color = 'red', size = 1) +
   geom_text(aes(y = proportion, label = percent(proportion, accuracy = 0.1)), vjust = -.1, color = 'red') +
-  labs(title = 'Cumulative % of bad debtors', x = 'Category', y = 'Value') +
+  labs(title = 'Bad debtor (% total)', x = 'Category', y = 'Proportion') +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-#grid.arrange(bar_plot, line_plot, ncol = 2)
+grid.arrange(bar_plot, line_plot, ncol = 2)
 
 # start a new copy of the trimmed application dataset 
 application_clean <- length_filtered_application_records
@@ -240,12 +242,6 @@ debt_quality_table <- data.frame(debt_quality = names(debt_quality_counts), coun
 
 # Print the table
 #debt_quality_table
-```
-
-+ **Data analysis and cleaning:** the dataset was screened for nulls, blanks, and duplicates and further trimmed to only include IDs with 20+ months banking history. 88.9% of debtors has more than 0 days of delinquency which could very well be an honest mistake and not representative of their ability to service their payments. Thus we defined **30+ days of delinquency as our target feature, denoted as class 1. <mark>The resulting dataset contained 21,575 customers of which 2,895 customers (c.13%) are in class 1</mark>**.
-
-```{r}
-grid.arrange(bar_plot, line_plot, ncol = 2)
 ```
 
 + Delinquency rate by occupation type shown below. We can see that delinquency rate does not necessarily increase with lower wages and some occupation has large variability in total income. 
@@ -407,7 +403,7 @@ grid.arrange(corr_1_plot,
 + **Min-max scaling:** applied to numerical data (excluding the target) to remove bias from large values. 
 + **One-hot-encode:** applied to categorical data (excluding the target) to create binary representation of each categorical value. This is done as some machine learning models require numerical input. 
 + **Synthetic Minority Over-sampling Technique (SMOTE):** applied to the training set to prevent bias towards majority class due to data imbalance. SMOTE works by creating synthetic data points between randomly-chosen k-nearest neighbor at random distances in the feature space. In practice, SMOTE should only be used on <mark> training data</mark> to prevent leakage. 
-+ **UpSampling:** applied to the training set to address significant imbalances between classes. upSample operates by increasing the number of instances of the minority class through duplication of random instances.
++ **Up-sampling:** applied to the training set to address significant imbalances between classes. upSample operates by increasing the number of instances of the minority class through duplication of random instances.
 + **Principal Component Analysis (PCA)**: applied to the training set to reduce data dimensionality used in Support Vector Machine (SVM). As discussed below, SVM works by building a decision boundary/hyperplane that best separates features. This process can be overly complicated on overly complex dataset. 
 
 ```{r}
@@ -507,9 +503,9 @@ colnames(overall.results.df) <- col_names
 
 + **Description:** Random forest is an ensemble method which combines multiple decision trees to create predictions. Random forest is known for its robustness against overfitting as it takes random features in each of the individual decision trees and takes an average/vote of these trees for a combined result. 
 
-+ **Design:** 1. We applied min-max scaling, one-hot-encoding and SMOTE to the dataset. 2. Grid search was applied on **'ntree'** and **'mtry'** to identify the model with the best **f1-score**, which gives a balance between precision (minimizing false positives) and recall (minimizing false negatives). 3. We also identified most important features to understand what drives bad debt. The best model was tested against the test dataset which is presented in the 'classification performance evaluation' section. 
++ **Design:** (i) Data pre-processing: min-max scaling, one-hot-encoding and SMOTE were applied to the dataset. (ii) Hyperparameter tuning: grid search using train and validation sets were applied on **'ntree'** (number of trees) and **'mtry'** (number of features considered for splitting) to identify the model with the best **f1-score**. (iii) Rationale for metric selection: f1-score gives a balance between precision (minimizing false positives) and recall (minimizing false negatives). (iv) Key feature identification: the top-10 most important features were identified to understand the drivers of bad debt.  
 
-+ **The best model parameters by accuracy score shown below:**
++ **The best model parameters by f1-score shown below:**
 
 ```{r}
 #PRE-PROCESSING
@@ -541,9 +537,7 @@ actual.val <- processed_data.val$debt_quality
 
 #apply SMOTE to training data only
 smote_processed_data <- apply_smote(processed_data.train,target_col='debt_quality')
-```
 
-```{r}
 # Model and grid search
 
 #initiate results grid
@@ -609,7 +603,7 @@ cat('- balanced accuracy: ', best_balanced.accuracy,'\n')
 cat('- f1 score: ', best_f1.score,'\n')
 ```
 
-+ Grid search results shown below. Although maximum accuracy is high (0.86), sensitivity and precision scores are low, suggesting that the model has high counts of false negatives and false positives. 
++  Low sensitivity, precision, and f1-score implies the model has high proportion of false negatives and false positives and is unreliable. Overall grid search results shown below.
 
 ```{r}
 #plot gridsearch results
@@ -645,7 +639,7 @@ grid.arrange(rf.accuracy.plot, rf.sensitivity.plot, rf.precision.plot, rf.f1.sco
 ```
 
 
-+ Top-10 most important features (by Gini impurity)  shown below. We can see that the top-5 features drive the prediction of our random forest model. 
++ Key features: the top-5 features, which are children_count, income_total_log, age_years, relationship_length, and employment_years, show significant gini decrease values. 
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #random forest test score
@@ -675,7 +669,9 @@ overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.c
 
 + **Description:** Logistic Regression is a statistical model used for predicting the probability of occurrence of an event by fitting data to a logistic curve. It is particularly adept for binary classification problems. One of the inherent strengths of logistic regression is its ability to estimate the probability of an event, allowing for a nuanced decision-making process. When combined with regularization techniques such as L1 (Lasso) and L2 (Ridge), the model can mitigate overfitting, especially in scenarios with a large feature set.
 
-+ **Design:** (i)Hyperparameter Tuning with Cross-Validation: A comprehensive grid search, coupled with 5-fold cross-validation, was conducted over hyperparameters alpha (indicating the type of regularization) and lambda (denoting the regularization strength). Cross-validation ensures a robust estimation of model performance across different subsets of the training data, preventing overfitting and providing a more generalized model.(ii) Model Training and Evaluation: The logistic regression model was trained using the best hyperparameters derived from the grid search. Performance metrics, including accuracy, precision, sensitivity, specificity, and F1 score, were evaluated on both the training and test datasets to understand the model's predictive power comprehensively.(iii) Rationale for Metric Selection: Accuracy was chosen as the primary metric for hyperparameter tuning and model evaluation due to several factors:The preprocessing steps ensured a balanced representation of both classes, making accuracy a relevant and reliable performance measure. Logistic regression’s output of probabilities necessitates a threshold for classification. With a balanced dataset, accuracy provides a clear and direct measure of the model’s correctness in predictions. Among various metrics, accuracy is intuitive, straightforward to interpret, and computationally efficient, making it a practical choice for evaluating model performance.
++ **Design:** (i) Hyperparameter Tuning with Cross-Validation: A comprehensive grid search, coupled with 5-fold cross-validation, was conducted over hyperparameters alpha (indicating the type of regularization) and lambda (denoting the regularization strength). Cross-validation ensures a robust estimation of model performance across different subsets of the training data, preventing overfitting and providing a more generalized model.(ii) Model Training and Evaluation: The logistic regression model was trained using the best hyperparameters derived from the grid search. Performance metrics, including accuracy, precision, sensitivity, specificity, and F1 score, were evaluated on both the training and test datasets to understand the model's predictive power. (iii) Rationale for Metric Selection: Accuracy was chosen as the primary metric for hyperparameter tuning and model evaluation due to several factors: the pre-processing steps ensured a balanced representation of both classes, making accuracy a relevant and reliable performance measure. Logistic regression’s output of probabilities necessitates a threshold for classification. With a balanced dataset, accuracy provides a clear and direct measure of the model’s correctness in predictions. Among various metrics, accuracy is intuitive, straightforward to interpret, and computationally efficient, making it a practical choice for evaluating model performance.
+
++ **The best model parameters by f1 score shown below:**
 
 ```{r}
 # Processing variables, create dummy variables, separate categorical variables and numerical variables.
@@ -770,13 +766,17 @@ LogRes.train_results.f1 = confusion_matrix_train$byClass["F1"]
 
 # Print out the training results
 #LogRes.train_results.table
-cat('Training scores for best model (by accuracy score) as follow:\n')
+cat('Best model parameters(maximizing accuracy score):\n')
+cat('- alpha:', best_alpha,'\n')
+cat('- lambda:', best_lambda,'\n')
+
+cat('Training scores for the best model:\n')
 cat('- accuracy: ',LogRes.train_results.accuracy,'\n')
 cat('- precision: ',LogRes.train_results.precision,'\n')
 cat('- sensitivity: ',LogRes.train_results.sensitivity,'\n')
 cat('- specificity: ',LogRes.train_results.specificity,'\n')
 cat('- balanced accuracy: ',LogRes.train_results.balanced.accuracy,'\n')
-cat('- f1: ',LogRes.train_results.f1,'\n')
+cat('- f1 score: ',LogRes.train_results.f1,'\n')
 
 # Predict using the best model on the test data
 test_probs <- predict(fit, newx = as.matrix(test_data[, -ncol(test_data)]), type = "response")
@@ -801,7 +801,7 @@ LogRes.results.f1 = confusion_matrix_updated$byClass["F1"]
 #cat('The testing set sensitivity is: ',LogRes.results.sensitivity,'\n')
 #cat('The testing set specificity is: ',LogRes.results.specificity,'\n')
 #cat('The testing set balance accuracy is: ',LogRes.results.balanced.accuracy,'\n')
-#cat('The testing set f1 is: ',LogRes.results.f1,'\n')
+#cat('The testing set f1 score is: ',LogRes.results.f1,'\n')
 
 
 # store results of logres in overall.results.df
@@ -814,6 +814,10 @@ overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
 
 results <- grid_search$results
 ```
+```{r}
+fit
+```
+
 + Accuracy scores for different alpha and lambda values shown below:
 
 ```{r}
@@ -834,7 +838,9 @@ ggplot(results, aes(x = lambda, y = Accuracy, color = as.factor(alpha))) +
 
 + **Description:** LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. LDA does not require any hyperparameter tuning, since the  <mark>lda()</mark> function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. 
 
-+ **Design:** (i) we applied min-max scaling, one-hot-encoding and SMOTE to the dataset, (ii)  <mark> lda() </mark> was run with 5 fold cross-validation, (iii) model with best accuracy score is chosen since : 1) The SMOTE pre processing done means that the classes are not too imbalanced, hence accuracy becomes a relevant metric , 2) LDA works in such a way that it uses correlation matrices to find the best results, hence accuracy is generally the more useful metric than sensitivity or precision since this mitigates a lot of the imbalance and 3) accuracy is the easiest metric to interpret and it is the most computationally efficient to calculate.   (iv)the best model was tested against the test dataset which is presented in the 'classification performance evaluation' section. **Results shown below:**
++ **Design:** (i) Data pre-processing: min-max scaling, one-hot-encoding and SMOTE were applied to the dataset, (ii) hyperparameter tuning: <mark> lda() </mark> was run with 5 fold cross-validation, (iii) Rationale for metric selection: best accuracy score is chosen since : 1) The SMOTE pre processing done means that the classes are not too imbalanced, hence accuracy becomes a relevant metric , 2) LDA works in such a way that it uses correlation matrices to find the best results, hence accuracy is generally the more useful metric than sensitivity or precision since this mitigates a lot of the imbalance and 3) accuracy is the easiest metric to interpret and it is the most computationally efficient to calculate. 
+
++ **The best model parameters by accuracy score shown below:**
 
 ```{r}
 
@@ -888,9 +894,9 @@ ggplot(cv_results, aes(x = Iteration, y = Accuracy)) +
 
 + **Description:** Ada is an ensemble learning algorithm that builds a strong classifier by combining multiple weak learners, in this case decision trees. Ada works by focusing on instances of the dataset that are most difficult to classify by adaptively adjusting weights during successive training rounds.
 
-+ **Design:** (i) applied mix-max scaling, one-hot encoding (ii) data was oversampled using upSample and SMOTE (iii) grid search was run on iterator, loss, maxdepth values as well as the two oversampling techniques (iv) the results, encompassing accuracy, precision, sensitivity and F1-score, were compiled into overall.results.df
++ **Design:** (i) Data pre-processing: mix-max scaling, one-hot encoding were applied. Data was then oversampled using upSample and SMOTE. (ii) Hyperparameter tuning: grid search was run on iterator, loss functions, maxdepth values as well as the two oversampling techniques. (iii) Rationale for metric selection: balanced accuracy was chosen as it takes into account both the true positive rate (sensitivity) and true negative rate, while mitigating the impact of class imbalance.
 
-+ Results shown below:
++ **The best model parameters by accuracy score shown below:**
 
 ```{r}
 
@@ -986,23 +992,19 @@ max_precision <- best_model_params$precision
 max_sensitivity <- best_model_params$sensitivity # also known as recall
 max_f1 <- best_model_params$f1.score
 
-cat('The AdaBoost model is optimized for maximum balanced accuracy.\n')
-cat('\n')
-cat("Maximum balanced accuracy on validation set:", max_balanced_accuracy, "with the following parameters:\n")
+cat('Best model parameters (maximizing balanced accuracy):\n')
 cat("- loss function: ", best_loss, "\n")
 cat("- max depth: ", best_maxdepth, "\n")
 cat("- iterations: ", best_iter, "\n")
 cat("- balancing technique: ", best_bal, "\n")
 cat('\n')
-cat("Other validation scores for the best model:\n")
+cat("Training scores for the best model:\n")
 cat('- accuracy: ', max_accuracy, "\n")
 cat('- precision: ', max_precision, "\n")
 cat('- sensitivity: ', max_sensitivity, "\n")
+cat('- balanced accuracy: ', max_balanced_accuracy, "\n")
 cat('- f1 score: ', max_f1, "\n")
-```
 
-
-```{r}
 if(best_bal == "upSample"){
   best_balanced_data <- upSampled_data
 }else{
@@ -1027,6 +1029,8 @@ overall.results.df['f1.score','AdaBoost'] <- 2 * (ada_test_results$byClass['Prec
 
 ```
 
++ Scores for SMOTE and up-sample shown below:
+
 ```{r}
 
 tidy_results <- ada_results.df %>%
@@ -1041,13 +1045,13 @@ ggplot(tidy_results, aes(fill=bal, y=value, x=metric)) +
 
 ```
 
-
-
 ### 5. Support vector machine
 
 + **Description:** Support Vector Machines (SVM) are a set of supervised learning methods used for classification, regression, and outliers detection. Given a set of training examples, each marked as belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples to one category or the other. It is a representation of the examples as points in space, mapped so that the examples of the separate categories are divided by a clear gap that is as wide as possible.
 
-+ **Design:** (i) we applied min-max scaling and one-hot-encoding to the dataset, (ii) Principal Component Analysis (PCA) is a commonly used data preprocessing technique, especially when dealing with high-dimensional data algorithms like Support Vector Machines (SVM). we use PCA to preprocess both train and test data, (iii) the grid search technique was applied on **'class.weights'** to find the **best f1 score**. F1 score was chosen to achieve a good balance between precision (minimizing false positives) and recall (minimizing false negatives). Accuracy was not maximised as the dataset is imbalanced, (iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by best f1 score shown below:**
++ **Design:** (i) Data pre-processing: min-max scaling and one-hot-encoding were applied to the dataset. Principal Component Analysis (PCA) was used on train and test sets for feature selection. (ii) Hyperparameter tuning: the grid search technique was applied on **'class.weights'** to find the **best f1 score**. (iv) Rationale for metric selection: f1-score was chosen to achieve a good balance between precision (minimizing false positives) and recall (minimizing false negatives). Accuracy was not maximised as the dataset is imbalanced.
+
++ **The best model parameters by f1 score shown below:**
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #create train and test data
@@ -1123,19 +1127,14 @@ class_weights = list(c("0" = 1, "1" = 2),  c("0" = 1, "1" = 3), c("0" = 1, "1" =
 svm.result.df <- grid_search_svm(train_data_pca, train_predict_data_pca, class_weights) 
 svm.result.df <- svm.result.df[svm.result.df$class.weight != 1, ]
 
-```
-
-+ Plots of results shown below:
-
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
-
+#define row index for max f1 score
 max_row_index <- which.max(svm.result.df$f1.score)
 best_result <- svm.result.df[max_row_index, ]
 class_weight = class_weights[[max_row_index]]
 
 # Print out best model results
-cat('The SVM model is optimized for maximum f1-score:\n')
-cat("- best class weights: ", class_weight, "\n")
+cat('Best model parameters (maximizing f1 score):\n')
+cat("- class weights: ", class_weight, "\n")
 
 cat("Training scores for the best model:\n")
 cat('- accuracy: ', best_result$accuracy , "\n")
@@ -1144,9 +1143,6 @@ cat('- sensitivity: ', best_result$sensitivity, "\n")
 cat('- specificity: ', best_result$specificity, "\n")
 cat('- balanced accuracy: ', best_result$balanced.accuracy, "\n")
 cat('- f1 score: ', best_result$f1.score, "\n")
-```
-
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 
 # Use the appropriate params to create model
 pca.svm.model <- svm(debt_quality ~ ., data = train_data_pca_full, kernel = "radial", class.weights = class_weight)
@@ -1180,13 +1176,23 @@ svm.sensitivity.plot <- ggplot(svm.result.df, aes(x = class.weight, y = sensitiv
   ggtitle('Sensitivity') +
   theme_minimal()
 
-grid.arrange(svm.accuracy.plot, svm.sensitivity.plot, ncol = 2)
+svm.precision.plot <- ggplot(svm.result.df, aes(x = class.weight, y = precision)) +
+  geom_line() +
+  labs(x = "class_weight", y = "precision") +
+  ggtitle('Precision') +
+  theme_minimal()
+
+svm.f1.score.plot <- ggplot(svm.result.df, aes(x = class.weight, y = f1.score)) +
+  geom_line() +
+  labs(x = "class_weight", y = "precision") +
+  ggtitle('Precision') +
+  theme_minimal()
+
+grid.arrange(svm.accuracy.plot, svm.sensitivity.plot, svm.precision.plot,svm.f1.score.plot,ncol = 2)
 ```
 
 
 ## RESULTS
-
-Test results are displayed below:
 
 ```{r}
 rounded.results.df <- round(overall.results.df,3)
@@ -1209,19 +1215,19 @@ ggplot(rounded.results.df_long, aes(x = Category, y = Score, fill = Method)) +
   theme_minimal()
 ```
 
-**Since our dataset is imbalanced, with class 1 accounting for only c.16% of data points, the team has chosen measures which focuses on maximizing true positives and minimizing false positives and false negatives:**
-+ **precision** (TP / (TP+FP)): high precision implies low proportion of false positives. All models aside from logistic regression performed relatively well (87%+) which means they were able to correctly identify actual bad debtors without being 'too strict' whereby not too many good debtors were mistakenly flagged as bad debtors.
-+ **sensitivity** (TP/(TP+FN)): high sensitivity implies low proportion of false negatives. Random forest and support vector machine scored higher (99%+) than the rest which means they were able to correctly identify almost all bad debtors in the test set. 
-+ It is worth noting that all models scored lower in **specificity** (TN/(TN+FP)),  a high specificity score implies that the model performs well the model can differentiate good debtor from the rest 
+**Due to data imbalance, performance measures which accounts for true values while minimizing false positives and false negatives were analyzed:**
 
++ **Precision = (True Positives / (True Positives + False Positives))**: precision measures the accuracy of a model when it predicts a positive class. All models aside from logistic regression performed relatively well (87%+) which means they were able to correctly identify actual bad debtors and not misclassifying too many good debtors as bad debtors.
 
-**Final model recommendation:** We recommend Random Forest (RF) for this analysis, though it still has its limitations, as shown by its specificity score (0.41, caused by moderately high false positives). This implies that the RF model is 'too strict' : where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
++ **Sensitivity = (True Positives / (True Positives + False Negatives))**: sensitivity measures the model's ability to correctly identify positive instances from the total number of actual positive instances in the dataset. Random forest scored highest which means the model was able to correctly identify almost all bad debtors in the test set. 
+
+**Final model recommendation:** We recommend Random Forest (RF) for this analysis, though it still has its limitations, as shown by its low specificity score. This implies that the RF model is 'too strict', where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
 
 ## DISCUSSION
 
-**Conclusion:** [.]
+**Potential shortcomings and future work:** (i) Data imbalance: additional data points on bad debt would address the bias experienced in this dataset. (ii) Data features: additional features could be collected which may have higher correlation with the target feature. For example: customer credit score, criminal records, past history of indebtedness, identifier on any existing factors that would signal lower delinquency risk such as letter of guarantee, employer reference, etc. (iii) Hyperparameter tuning: a wider tuning grid could be applied to ensure that each model achieves its global optimum solution. 
 
-**Improvements:** To improve model performance, additional data may be needed (e.g. higher volume of customer data and expanding features collected at application). Other useful features that may be collected include information on wealth level, history of indebtedness at other financial institutions, criminal records,  etc. If we had a greater amount of resources, perhaps a deep learning model could have been trained on a significantl large enough dataset to ensure better results, and also ensure that it 'learns' from the data such that it can handle outliers on its own and be used in multiple use cases and more extensively. 
+**Conclusion:** Machine learning can be utilized as a layer of first screening for potential bad debtors if it is provided with a rich dataset. Our largest obstacle was data imbalance which can be solved with a larger number (and wider spread) of customer track record and information at point of application. This exercise also makes clear why the use of credit score is prevalent in the credit card industry, as it accumulates credit behaviour data from sources not directly available otherwise at point of application.
 
 ## REFERENCES
 
