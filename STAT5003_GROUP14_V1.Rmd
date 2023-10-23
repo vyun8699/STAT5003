@@ -481,6 +481,8 @@ apply_smote <- function(dataframe, target_col){
 
 ## CLASSIFICATION METHODS
 
+Five algorithms are used in this exercise and discussed below. Please see results on testing scores in the 'RESULTS' section.
+
 ```{r}
 # create empty dataframe to store results
 
