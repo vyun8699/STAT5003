@@ -91,7 +91,7 @@ credit_record <- credit_record %>%
 #cat("Dimensions of credit_record: Rows =", dim(credit_record)[1], "Columns =", dim(credit_record)[2], "\n")
 ```
 
-## VISUALIZATION AND FEATURE ENGINEERING:
+## FEATURE ENGINEERING
 
 ```{r}
 # check and remove NAs --> no NAs found
@@ -242,7 +242,7 @@ debt_quality_table <- data.frame(debt_quality = names(debt_quality_counts), coun
 #debt_quality_table
 ```
 
-+ **Data analysis and cleaning:** the dataset was screened for nulls, blanks, and duplicates and further trimmed to only include relevant IDs with 20+ months banking history. 88.9% of debtors has more than 0 days of delinquency which could very well be an honest mistake and not representative of their ability to service their payments. Thus we defined **30+ days of delinquency as our target feature. The resulting dataset contained 21,575 customers of which 2,895 customers (c.13%) are in class 1**.
++ **Data analysis and cleaning:** the dataset was screened for nulls, blanks, and duplicates and further trimmed to only include IDs with 20+ months banking history. 88.9% of debtors has more than 0 days of delinquency which could very well be an honest mistake and not representative of their ability to service their payments. Thus we defined **30+ days of delinquency as our target feature, denoted as class 1. <mark>The resulting dataset contained 21,575 customers of which 2,895 customers (c.13%) are in class 1</mark>**.
 
 ```{r}
 grid.arrange(bar_plot, line_plot, ncol = 2)
@@ -408,6 +408,7 @@ grid.arrange(corr_1_plot,
 + **One-hot-encode:** applied to categorical data (excluding the target) to create binary representation of each categorical value. This is done as some machine learning models require numerical input. 
 + **Synthetic Minority Over-sampling Technique (SMOTE):** applied to the training set to prevent bias towards majority class due to data imbalance. SMOTE works by creating synthetic data points between randomly-chosen k-nearest neighbor at random distances in the feature space. In practice, SMOTE should only be used on <mark> training data</mark> to prevent leakage. 
 + **UpSampling:** applied to the training set to address significant imbalances between classes. upSample operates by increasing the number of instances of the minority class through duplication of random instances.
++ **Principal Component Analysis (PCA)**: applied to the training set to reduce data dimensionality used in Support Vector Machine (SVM). As discussed below, SVM works by building a decision boundary/hyperplane that best separates features. This process can be overly complicated on overly complex dataset. 
 
 ```{r}
 # PRE PROCESSING FUNCTIONS
@@ -506,7 +507,9 @@ colnames(overall.results.df) <- col_names
 
 + **Description:** Random forest is an ensemble method which combines multiple decision trees to create predictions. Random forest is known for its robustness against overfitting as it takes random features in each of the individual decision trees and takes an average/vote of these trees for a combined result. 
 
-+ **Design:** (i) we applied min-max scaling, one-hot-encoding and SMOTE to the dataset, (ii)  the grid search technique was applied on **'ntree'** and **'mtry'**, (iii) we identified most important features to understand what drives bad debt, and lastly (iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by accuracy score shown below:**
++ **Design:** 1. We applied min-max scaling, one-hot-encoding and SMOTE to the dataset. 2. Grid search was applied on **'ntree'** and **'mtry'** to identify the model with the best **f1-score**, which gives a balance between precision (minimizing false positives) and recall (minimizing false negatives). 3. We also identified most important features to understand what drives bad debt. The best model was tested against the test dataset which is presented in the 'classification performance evaluation' section. 
+
++ **The best model parameters by accuracy score shown below:**
 
 ```{r}
 #PRE-PROCESSING
@@ -582,7 +585,7 @@ rownames(rf.results.df) <- NULL
 #rf.results.df
 
 # Find index of max sensitivity and get values of the associated ntree and mtry
-max_row_index <- which.max(rf.results.df$accuracy)
+max_row_index <- which.max(rf.results.df$f1.score)
 ntree_max <- rf.results.df$ntree[max_row_index]
 mtry_max <- rf.results.df$mtry[max_row_index]
 best_accuracy <- rf.results.df$accuracy[max_row_index]
@@ -593,7 +596,7 @@ best_balanced.accuracy <- rf.results.df$balanced.accuracy[max_row_index]
 best_f1.score <- rf.results.df$f1.score[max_row_index]
 
 # Print the values
-cat('Best model parameters:\n')
+cat('Best model parameters (maximizing f1 score):\n')
 cat("- ntree: ", ntree_max,"\n")
 cat("- mtry: ", mtry_max,"\n")
 cat('\n')
@@ -606,7 +609,7 @@ cat('- balanced accuracy: ', best_balanced.accuracy,'\n')
 cat('- f1 score: ', best_f1.score,'\n')
 ```
 
-+ Accuracy, sensitivity and precision plots shown below. Although maximum accuracy is high (0.86), sensitivity and precision scores are low, suggesting that the model has high counts of false negatives and false positives. 
++ Grid search results shown below. Although maximum accuracy is high (0.86), sensitivity and precision scores are low, suggesting that the model has high counts of false negatives and false positives. 
 
 ```{r}
 #plot gridsearch results
@@ -631,11 +634,18 @@ rf.sensitivity.plot <- ggplot(rf.results.df, aes(x = ntree, y = sensitivity, col
   ggtitle('Sensitivity') +
   theme_minimal()
 
-grid.arrange(rf.accuracy.plot, rf.sensitivity.plot, rf.precision.plot, ncol = 3)
+rf.f1.score.plot <- ggplot(rf.results.df, aes(x = ntree, y = f1.score, color = factor(mtry))) +
+  geom_line() +
+  labs(x = "ntree", y = "f1 score", color = "mtry") +
+  scale_color_discrete(name = "mtry") +
+  ggtitle('f1 score') +
+  theme_minimal()
+
+grid.arrange(rf.accuracy.plot, rf.sensitivity.plot, rf.precision.plot, rf.f1.score.plot, ncol = 2)
 ```
 
 
-+ Top-10 most important features (by Gini impurity)  shown below. We can see that 'relationship_length', 'age_years', 'income_total_log', and 'employment_years' are the key drivers to prediction outcome. 
++ Top-10 most important features (by Gini impurity)  shown below. We can see that the top-5 features drive the prediction of our random forest model. 
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #random forest test score
@@ -657,7 +667,7 @@ overall.results.df['specificity','RF'] <- rf.cm.best$byClass['Specificity']
 overall.results.df['balanced.accuracy','RF'] <- (rf.cm.best$byClass['Sensitivity'] + rf.cm.best$byClass['Specificity'])/2
 overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.cm.best$byClass['Sensitivity'])/((rf.cm.best$byClass['Precision'] + rf.cm.best$byClass['Sensitivity']))
 
-cat('confusion table:\n')
+#cat('confusion table:\n')
 #rf.cm.best
 ```
 
@@ -665,7 +675,7 @@ cat('confusion table:\n')
 
 + **Description:** Logistic Regression is a statistical model used for predicting the probability of occurrence of an event by fitting data to a logistic curve. It is particularly adept for binary classification problems. One of the inherent strengths of logistic regression is its ability to estimate the probability of an event, allowing for a nuanced decision-making process. When combined with regularization techniques such as L1 (Lasso) and L2 (Ridge), the model can mitigate overfitting, especially in scenarios with a large feature set.
 
-+ **Design:** (i)Hyperparameter Tuning with Cross-Validation: A comprehensive grid search, coupled with 5-fold cross-validation, was conducted over hyperparameters alpha (indicating the type of regularization) and lambda (denoting the regularization strength). Cross-validation ensures a robust estimation of model performance across different subsets of the training data, preventing overfitting and providing a more generalized model.(ii) Model Training and Evaluation: The logistic regression model was trained using the best hyperparameters derived from the grid search. Performance metrics, including accuracy, precision, sensitivity, specificity, and F1 score, were evaluated on both the training and test datasets to understand the model's predictive power comprehensively.(iii) Rationale for Metric Selection: Accuracy was chosen as the primary metric for hyperparameter tuning and model evaluation due to several factors:The preprocessing steps ensured a balanced representation of both classes, making accuracy a relevant and reliable performance measure./Logistic regression’s output of probabilities necessitates a threshold for classification. With a balanced dataset, accuracy provides a clear and direct measure of the model’s correctness in predictions./Among various metrics, accuracy is intuitive, straightforward to interpret, and computationally efficient, making it a practical choice for evaluating model performance.
++ **Design:** (i)Hyperparameter Tuning with Cross-Validation: A comprehensive grid search, coupled with 5-fold cross-validation, was conducted over hyperparameters alpha (indicating the type of regularization) and lambda (denoting the regularization strength). Cross-validation ensures a robust estimation of model performance across different subsets of the training data, preventing overfitting and providing a more generalized model.(ii) Model Training and Evaluation: The logistic regression model was trained using the best hyperparameters derived from the grid search. Performance metrics, including accuracy, precision, sensitivity, specificity, and F1 score, were evaluated on both the training and test datasets to understand the model's predictive power comprehensively.(iii) Rationale for Metric Selection: Accuracy was chosen as the primary metric for hyperparameter tuning and model evaluation due to several factors:The preprocessing steps ensured a balanced representation of both classes, making accuracy a relevant and reliable performance measure. Logistic regression’s output of probabilities necessitates a threshold for classification. With a balanced dataset, accuracy provides a clear and direct measure of the model’s correctness in predictions. Among various metrics, accuracy is intuitive, straightforward to interpret, and computationally efficient, making it a practical choice for evaluating model performance.
 
 ```{r}
 # Processing variables, create dummy variables, separate categorical variables and numerical variables.
@@ -820,7 +830,7 @@ ggplot(results, aes(x = lambda, y = Accuracy, color = as.factor(alpha))) +
 ```
 
 
-### 3. linear discriminant analysis (LDA)
+### 3. Linear discriminant analysis (LDA)
 
 + **Description:** LDA is a dimensionality reduction technique that works by finding the linear combination of features that best separates multiple classes in data.  It is very interpretable, and very robust against overfitting since it best estimates the discriminant boundaries using covariance information. LDA does not require any hyperparameter tuning, since the  <mark>lda()</mark> function in the MASS package tunes parameters itself, using the covariance matrices of the input data. This means that for this technique, only cross validation has been done to ensure robustness. 
 
@@ -1037,7 +1047,7 @@ ggplot(tidy_results, aes(fill=bal, y=value, x=metric)) +
 
 + **Description:** Support Vector Machines (SVM) are a set of supervised learning methods used for classification, regression, and outliers detection. Given a set of training examples, each marked as belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples to one category or the other. It is a representation of the examples as points in space, mapped so that the examples of the separate categories are divided by a clear gap that is as wide as possible.
 
-+ **Design:** (i) we applied min-max scaling and one-hot-encoding to the dataset, (ii) Principal Component Analysis (PCA) is a commonly used data preprocessing technique, especially when dealing with high-dimensional data algorithms like Support Vector Machines (SVM). we use PCA to preprocess both train and test data, (iii) the grid search technique was applied on **'class.weights'** to find the **best f1 score**.The reason why we choose F1 score for evaluating the performance of SVM is that The F1 score tries to find the balance between precision and recall.And the dataset is imbalanced which accuracy cannot adequately measure the recognition performance of the model.(iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by best f1 score shown below:**
++ **Design:** (i) we applied min-max scaling and one-hot-encoding to the dataset, (ii) Principal Component Analysis (PCA) is a commonly used data preprocessing technique, especially when dealing with high-dimensional data algorithms like Support Vector Machines (SVM). we use PCA to preprocess both train and test data, (iii) the grid search technique was applied on **'class.weights'** to find the **best f1 score**. F1 score was chosen to achieve a good balance between precision (minimizing false positives) and recall (minimizing false negatives). Accuracy was not maximised as the dataset is imbalanced, (iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by best f1 score shown below:**
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #create train and test data
@@ -1119,38 +1129,23 @@ svm.result.df <- svm.result.df[svm.result.df$class.weight != 1, ]
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 
-max_row_index <- which.max(svm.result.df$balanced.accuracy)
+max_row_index <- which.max(svm.result.df$f1.score)
 best_result <- svm.result.df[max_row_index, ]
 class_weight = class_weights[[max_row_index]]
 
 # Print out best model results
-cat('The SVM model is optimized for maximum balanced accuracy.\n')
-cat('\n')
-cat("Maximum balanced accuracy on validation set:", best_result$balanced.accuracy, "with the following parameters:\n")
+cat('The SVM model is optimized for maximum f1-score:\n')
 cat("- best class weights: ", class_weight, "\n")
-cat('\n')
-cat("Other validation scores for the best model:\n")
+
+cat("Training scores for the best model:\n")
 cat('- accuracy: ', best_result$accuracy , "\n")
 cat('- precision: ', best_result$precision, "\n")
 cat('- sensitivity: ', best_result$sensitivity, "\n")
+cat('- specificity: ', best_result$specificity, "\n")
+cat('- balanced accuracy: ', best_result$balanced.accuracy, "\n")
 cat('- f1 score: ', best_result$f1.score, "\n")
-
-#plot gridsearch results
-svm.accuracy.plot <- ggplot(svm.result.df, aes(x = class.weight, y = f1.score)) +
-  geom_line() +
-  labs(x = "class_weight", y = "f1.score") +
-  ggtitle('Accuracy') +
-  theme_minimal()
-
-svm.sensitivity.plot <- ggplot(svm.result.df, aes(x = class.weight, y = sensitivity)) +
-  geom_line() +
-  labs(x = "class_weight", y = "sensitivity") +
-  ggtitle('Sensitivity') +
-  theme_minimal()
-
-grid.arrange(svm.accuracy.plot, svm.sensitivity.plot, ncol = 2)
-
 ```
+
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 
 # Use the appropriate params to create model
