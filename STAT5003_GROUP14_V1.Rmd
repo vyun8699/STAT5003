@@ -2,7 +2,11 @@
 title: "STAT5003_14_Credit_Card_Analysis"
 author: "STAT5003 group project 14"
 date: "`r Sys.Date()`"
-output: pdf_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
 ---
 
 <style>
@@ -1227,7 +1231,7 @@ ggplot(rounded.results.df_long, aes(x = Category, y = Score, fill = Method)) +
 
 **Potential shortcomings and future work:** (i) Data imbalance: additional data points on bad debt would address the bias experienced in this dataset. (ii) Data features: additional features could be collected which may have higher correlation with the target feature. For example: customer credit score, criminal records, past history of indebtedness, identifier on any existing factors that would signal lower delinquency risk such as letter of guarantee, employer reference, etc. (iii) Hyperparameter tuning: a wider tuning grid could be applied to ensure that each model achieves its global optimum solution. 
 
-**Conclusion:** Machine learning can be utilized as a layer of first screening for potential bad debtors if it is provided with a rich dataset. Our largest obstacle was data imbalance which can be solved with a larger number (and wider spread) of customer track record and information at point of application. This exercise also makes clear why the use of credit score is prevalent in the credit card industry, as it accumulates credit behaviour data from sources not directly available otherwise at point of application.
+**Conclusion:** Machine learning can be utilized as a first layer screening for potential bad debtors if it is provided with a rich dataset. Our largest obstacle was data imbalance which can be solved with a larger number (and wider spread) of customer track record and richer information at point of application. This exercise also makes clear why the use of credit score is prevalent in the credit card industry, as it accumulates credit behaviour data from sources not directly available otherwise at point of application.
 
 ## REFERENCES
 
