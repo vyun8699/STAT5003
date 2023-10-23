@@ -1032,12 +1032,12 @@ ggplot(tidy_results, aes(fill=bal, y=value, x=metric)) +
 ```
 
 
+
 ### 5. Support vector machine
 
 + **Description:** Support Vector Machines (SVM) are a set of supervised learning methods used for classification, regression, and outliers detection. Given a set of training examples, each marked as belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples to one category or the other. It is a representation of the examples as points in space, mapped so that the examples of the separate categories are divided by a clear gap that is as wide as possible.
 
-+ **Design:** (i) we applied min-max scaling and one-hot-encoding to the dataset, (ii) Principal Component Analysis (PCA) is a commonly used data preprocessing technique, especially when dealing with high-dimensional data algorithms like Support Vector Machines (SVM). we use PCA to preprocess both train and test data, (iii) the grid search technique was applied on **'class.weights'** to find the **best accuracy score**,
-(iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by accuracy score shown below:**
++ **Design:** (i) we applied min-max scaling and one-hot-encoding to the dataset, (ii) Principal Component Analysis (PCA) is a commonly used data preprocessing technique, especially when dealing with high-dimensional data algorithms like Support Vector Machines (SVM). we use PCA to preprocess both train and test data, (iii) the grid search technique was applied on **'class.weights'** to find the **best f1 score**.The reason why we choose F1 score for evaluating the performance of SVM is that The F1 score tries to find the balance between precision and recall.And the dataset is imbalanced which accuracy cannot adequately measure the recognition performance of the model.(iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by best f1 score shown below:**
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 #create train and test data
@@ -1066,16 +1066,12 @@ grid_search_svm <- function(train_data, test_data, class_weights) {
                          sensitivity = numeric(),
                          specificity = numeric(),
                          balanced.accuracy = numeric(),
-                         f1.score = numeric(),
-                         true.positive = integer(),
-                         true.negative = integer(),
-                         false.positive = integer(),
-                         false.negative = integer()
+                         f1.score = numeric()
                          )
   for(class_weight in class_weights) {
     svm.model <- svm(debt_quality ~ ., data = train_data, kernel = "radial", class.weights = class_weight)
     svm.predict <- predict(svm.model, test_data) 
-    svm.cm <- confusionMatrix(svm.predict, reference = test_data$debt_quality)
+    svm.cm <- confusionMatrix(svm.predict, reference = test_data$debt_quality, positive="1")
     
     #add result to dataframe
     svm.results.df <- rbind(svm.results.df , data.frame(class.weight = class_weight,
@@ -1084,11 +1080,7 @@ grid_search_svm <- function(train_data, test_data, class_weights) {
                                               sensitivity = svm.cm$byClass['Sensitivity'],
                                               specificity = svm.cm$byClass['Specificity'],
                                               balanced.accuracy = (svm.cm$byClass['Sensitivity'] + svm.cm$byClass['Specificity']) /2,
-                                              f1.score = 2 * svm.cm$byClass['Precision'] * svm.cm$byClass['Sensitivity'] / (svm.cm$byClass['Precision'] + svm.cm$byClass['Sensitivity']),
-                                              true.positive = svm.cm$table[2,2],
-                                              true.negative = svm.cm$table[1,1],
-                                              false.positive = svm.cm$table[1,2],
-                                              false.negative = svm.cm$table[2,1]))
+                                              f1.score = 2 * svm.cm$byClass['Precision'] * svm.cm$byClass['Sensitivity'] / (svm.cm$byClass['Precision'] + svm.cm$byClass['Sensitivity'])))
   }
   return(svm.results.df)
 } 
@@ -1114,31 +1106,59 @@ train_predict_data_pca <- predict(select_data, processed_data.train.test)
 train_data_pca_full <- predict(select_data, processed_data.train)
 test_data_pca <- predict(select_data, processed_data.test)
 
-#Set class_weights set
-class_weights = list(c("0" = 1, "1" = 2),  c("0" = 1, "1" = 3), c("0" = 1, "1" = 4))
+#Set class_weights set, the max of the class weights should be less than the ratio of two classes of data 
+class_weights = list(c("0" = 1, "1" = 2),  c("0" = 1, "1" = 3), c("0" = 1, "1" = 4),c("0" = 1, "1" = 5), c("0" = 1, "1" = 6))
 
 #Use grid search to find the appropriate class weight parameters
 svm.result.df <- grid_search_svm(train_data_pca, train_predict_data_pca, class_weights) 
+svm.result.df <- svm.result.df[svm.result.df$class.weight != 1, ]
 
 ```
 
++ Plots of results shown below:
+
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
 
-max_row_index <- which.max(svm.result.df$sensitivity)
+max_row_index <- which.max(svm.result.df$balanced.accuracy)
+best_result <- svm.result.df[max_row_index, ]
 class_weight = class_weights[[max_row_index]]
+
+# Print out best model results
+cat('The SVM model is optimized for maximum balanced accuracy.\n')
+cat('\n')
+cat("Maximum balanced accuracy on validation set:", best_result$balanced.accuracy, "with the following parameters:\n")
+cat("- best class weights: ", class_weight, "\n")
+cat('\n')
+cat("Other validation scores for the best model:\n")
+cat('- accuracy: ', best_result$accuracy , "\n")
+cat('- precision: ', best_result$precision, "\n")
+cat('- sensitivity: ', best_result$sensitivity, "\n")
+cat('- f1 score: ', best_result$f1.score, "\n")
+
+#plot gridsearch results
+svm.accuracy.plot <- ggplot(svm.result.df, aes(x = class.weight, y = f1.score)) +
+  geom_line() +
+  labs(x = "class_weight", y = "f1.score") +
+  ggtitle('Accuracy') +
+  theme_minimal()
+
+svm.sensitivity.plot <- ggplot(svm.result.df, aes(x = class.weight, y = sensitivity)) +
+  geom_line() +
+  labs(x = "class_weight", y = "sensitivity") +
+  ggtitle('Sensitivity') +
+  theme_minimal()
+
+grid.arrange(svm.accuracy.plot, svm.sensitivity.plot, ncol = 2)
+
+```
+```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+
 # Use the appropriate params to create model
 pca.svm.model <- svm(debt_quality ~ ., data = train_data_pca_full, kernel = "radial", class.weights = class_weight)
 
 # Predict on the test data set using pca
-pca.svm.predictions <- predict(pca.svm.model, test_data_pca)
+pca.svm.predictions <- predict(pca.svm.model,test_data_pca)
 confusion_matrix_pca <- confusionMatrix(pca.svm.predictions, reference =  test_data_pca$debt_quality)
-
-# Print out training results
-#confusion_matrix_pca$table
-cat('The testing set accuracy is: ',confusion_matrix_pca$overall["Accuracy"],'\n')
-cat("Precision:",  confusion_matrix_pca$byClass["Precision"], "\n")
-cat("Recall:",  confusion_matrix_pca$byClass["Recall"], "\n")
-cat("F1 Score:", 2 * (confusion_matrix_pca$byClass["Precision"] * confusion_matrix_pca$byClass["Recall"]) / (confusion_matrix_pca$byClass["Precision"] + confusion_matrix_pca$byClass["Recall"]), "\n")
 
 overall.results.df['accuracy', 'SVM'] <- confusion_matrix_pca$overall["Accuracy"]
 overall.results.df['sensitivity', 'SVM'] <- confusion_matrix_pca$byClass["Sensitivity"]
@@ -1148,6 +1168,7 @@ overall.results.df['balanced.accuracy', 'SVM'] <- (confusion_matrix_pca$byClass[
 overall.results.df['f1.score', 'SVM'] <- 2*(confusion_matrix_pca$byClass['Precision'] * confusion_matrix_pca$byClass['Sensitivity'])/((confusion_matrix_pca$byClass['Precision'] + confusion_matrix_pca$byClass['Sensitivity']))
 
 ```
+
 + Plots of results shown below:
 
 ```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
