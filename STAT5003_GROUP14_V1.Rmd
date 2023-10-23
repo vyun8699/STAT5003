@@ -667,9 +667,9 @@ overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.c
 
 ### 2. Logistic Regression
 
-+ **Description:** [Sylvia]
++ **Description:** Logistic Regression is a statistical model used for predicting the probability of occurrence of an event by fitting data to a logistic curve. It is particularly adept for binary classification problems. One of the inherent strengths of logistic regression is its ability to estimate the probability of an event, allowing for a nuanced decision-making process. When combined with regularization techniques such as L1 (Lasso) and L2 (Ridge), the model can mitigate overfitting, especially in scenarios with a large feature set.
 
-+ **Design:** [Sylvia]
++ **Design:** (i)Hyperparameter Tuning with Cross-Validation: A comprehensive grid search, coupled with 5-fold cross-validation, was conducted over hyperparameters alpha (indicating the type of regularization) and lambda (denoting the regularization strength). Cross-validation ensures a robust estimation of model performance across different subsets of the training data, preventing overfitting and providing a more generalized model.(ii) Model Training and Evaluation: The logistic regression model was trained using the best hyperparameters derived from the grid search. Performance metrics, including accuracy, precision, sensitivity, specificity, and F1 score, were evaluated on both the training and test datasets to understand the model's predictive power comprehensively.(iii) Rationale for Metric Selection: Accuracy was chosen as the primary metric for hyperparameter tuning and model evaluation due to several factors:The preprocessing steps ensured a balanced representation of both classes, making accuracy a relevant and reliable performance measure./Logistic regression’s output of probabilities necessitates a threshold for classification. With a balanced dataset, accuracy provides a clear and direct measure of the model’s correctness in predictions./Among various metrics, accuracy is intuitive, straightforward to interpret, and computationally efficient, making it a practical choice for evaluating model performance.
 
 ```{r}
 # Processing variables, create dummy variables, separate categorical variables and numerical variables.
