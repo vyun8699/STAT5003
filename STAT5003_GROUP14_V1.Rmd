@@ -91,8 +91,7 @@ credit_record <- credit_record %>%
 #cat("Dimensions of credit_record: Rows =", dim(credit_record)[1], "Columns =", dim(credit_record)[2], "\n")
 ```
 
-
-+ **Initial data analysis and cleaning:** (i) the dataset was screened for nulls, blanks, and duplicates, (ii) trimmed to only include relevant IDs with 20+ months banking history, (iii) and seperated into two classes with label 'class 1' for customers with 30+ days due, and 'class 0' for everyone else. **The resulting dataset of 21,575 customers contains 2,895(c.13%) customers in class 1**.
+## VISUALIZATION AND FEATURE ENGINEERING:
 
 ```{r}
 # check and remove NAs --> no NAs found
@@ -243,20 +242,13 @@ debt_quality_table <- data.frame(debt_quality = names(debt_quality_counts), coun
 #debt_quality_table
 ```
 
-
-## VISUALIZATION AND FEATURE ENGINEERING:
-
-+ Cumulative spread of bad debtors shown below. 88.9% of debtors has more than 0 days of deliquency which could very well be an honest mistake and not representative of their ability to service their payments. Thus we defined 30+ days of deliquency as our target feature.
++ **Data analysis and cleaning:** the dataset was screened for nulls, blanks, and duplicates and further trimmed to only include relevant IDs with 20+ months banking history. 88.9% of debtors has more than 0 days of delinquency which could very well be an honest mistake and not representative of their ability to service their payments. Thus we defined **30+ days of delinquency as our target feature. The resulting dataset contained 21,575 customers of which 2,895 customers (c.13%) are in class 1**.
 
 ```{r}
 grid.arrange(bar_plot, line_plot, ncol = 2)
 ```
 
-+ 'familymembers_count' was dropped due to high correlation with 'children_count'. 
-+ 'income_total' transformed into 'income_total_log' to address long tail. 
-+ 'mobilephone_flag' was dropped as it only had a single value. 
-+ 'days_age' and 'days_employed' transformed into 'age_years' and 'employment_years'. 
-+ 'children_count' was cleaned for outliers (2 rows removed, negligible impact). 
++ Delinquency rate by occupation type shown below. We can see that delinquency rate does not necessarily increase with lower wages and some occupation has large variability in total income. 
 
 ```{r }
 # Count bad debt by occupation type, descending order
@@ -277,21 +269,24 @@ line.result$occupation_type <- factor(line.result$occupation_type, levels = line
 
 line_plot <- ggplot(line.result, aes(x = occupation_type)) +
   geom_line(aes(y = ratio, group = 1), color = 'red', size = 1) +
-  geom_text_repel(aes(y = ratio, label = percent(ratio, accuracy = 0.1)), nudge_x = 0.0, nudge_y = 0.05, color = 'red') +
-  labs(title = 'Bad debtors by occupation (% total count)', x = 'Category', y = 'Value') +
+  geom_text_repel(aes(y = ratio, label = percent(ratio, accuracy = 0.1)), nudge_x = 0.0, nudge_y = 0.02, color = 'red') +
+  labs(title = 'Bad debtors by occupation (% total count)', x = 'Occupation', y = 'Value') +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
 #Boxplot, x-axis matches line plot
 box_plot <- ggplot(application_clean, aes(x = factor(occupation_type, levels = levels(line.result$occupation_type)), y = income_total)) + 
   geom_boxplot() +
-  labs(title = 'Boxplot of Income by Occupation Type') +
+  labs(title = 'Boxplot of Income by Occupation Type', x = 'Occupation', y = 'Value') +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   scale_y_continuous(labels = scales::number_format(scale = 1e-6, suffix = "mn")) 
 
 #print them out
-print(line_plot)
-print(box_plot)
+#print(line_plot)
+#print(box_plot)
+grid.arrange(line_plot, box_plot, ncol = 2)
 ```
+
++ Selected feature distributions shown below to show the impact of data cleaning/transformation. 
 
 ```{r}
 # Plot 1: correlation before cleaning
@@ -396,7 +391,7 @@ grid.arrange(p_income_total,
              ncol = 2)
 ```
 
-+ Initial and resulting correlation plots shown below. Correlation between features can be seen by fewer red boxes.
++ Correlation plots shown below to show the impact of data cleaning/transformation. Improvement in correlation between features can be seen by fewer red boxes on the right.
 
 ```{r}
 layout_matrix <- rbind(c(1, 2))
@@ -509,7 +504,7 @@ colnames(overall.results.df) <- col_names
 
 + **Description:** Random forest is an ensemble method which combines multiple decision trees to create predictions. Random forest is known for its robustness against overfitting as it takes random features in each of the individual decision trees and takes an average/vote of these trees for a combined result. 
 
-+ **Design:** (i) we applied min-max scaling, one-hot-encoding and SMOTE to the dataset, (ii)  the grid search technique was applied on **'ntree'** and **'mtry'** to find the **best sensitivity score (to minimise false negatives)**, (iii) we identified most important features to understand what drives bad debt, and lastly (iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by sensitivity score shown below:**
++ **Design:** (i) we applied min-max scaling, one-hot-encoding and SMOTE to the dataset, (ii)  the grid search technique was applied on **'ntree'** and **'mtry'**, (iii) we identified most important features to understand what drives bad debt, and lastly (iv) we tested the best model against the test dataset which is presented in the 'classification performance evaluation' section. **The best model parameters by accuracy score shown below:**
 
 ```{r}
 #PRE-PROCESSING
@@ -609,26 +604,32 @@ cat('- balanced accuracy: ', best_balanced.accuracy,'\n')
 cat('- f1 score: ', best_f1.score,'\n')
 ```
 
-
-+ **sensitivity** and **precision** score plots shown below. We prioritized maximizing sensitivity score to keep false negatives low. This is to ensure bad debtors are properly identified as the cost of not discovering bad debtors is much higher than misclassifying good debtors as bad debtors.
++ Accuracy, sensitivity and precision plots shown below. Although maximum accuracy is high (0.86), sensitivity and precision scores are low, suggesting that the model has high counts of false negatives and false positives. 
 
 ```{r}
 #plot gridsearch results
+rf.accuracy.plot <- ggplot(rf.results.df, aes(x = ntree, y = accuracy, color = factor(mtry))) +
+  geom_line() +
+  labs(x = "ntree", y = "accuracy", color = "mtry") +
+  scale_color_discrete(name = "mtry") +
+  ggtitle('Accuracy') +
+  theme_minimal()
+
 rf.precision.plot <- ggplot(rf.results.df, aes(x = ntree, y = precision, color = factor(mtry))) +
   geom_line() +
   labs(x = "ntree", y = "precision", color = "mtry") +
   scale_color_discrete(name = "mtry") +
-  ggtitle('Precision = TP/(TP+FP)') +
+  ggtitle('Precision') +
   theme_minimal()
 
 rf.sensitivity.plot <- ggplot(rf.results.df, aes(x = ntree, y = sensitivity, color = factor(mtry))) +
   geom_line() +
   labs(x = "ntree", y = "sensitivity", color = "mtry") +
   scale_color_discrete(name = "mtry") +
-  ggtitle('Sensitivity = TP/(TP+FN)') +
+  ggtitle('Sensitivity') +
   theme_minimal()
 
-grid.arrange(rf.sensitivity.plot, rf.precision.plot, ncol = 2)
+grid.arrange(rf.accuracy.plot, rf.sensitivity.plot, rf.precision.plot, ncol = 3)
 ```
 
 
@@ -655,7 +656,7 @@ overall.results.df['balanced.accuracy','RF'] <- (rf.cm.best$byClass['Sensitivity
 overall.results.df['f1.score','RF'] <- 2*(rf.cm.best$byClass['Precision'] * rf.cm.best$byClass['Sensitivity'])/((rf.cm.best$byClass['Precision'] + rf.cm.best$byClass['Sensitivity']))
 
 cat('confusion table:\n')
-rf.cm.best
+#rf.cm.best
 ```
 
 ### 2. Logistic Regression
