@@ -42,7 +42,7 @@ library(ada)
 
 ## OVERVIEW
 
-+ **Problem statement:** Commercial banks need to continually observe the impact of customer's work and life stability on credit card defaults, which is costly to maintain [(Li et. al., 2019)](https://www.sciencedirect.com/science/article/pii/S0378437119304662?casa_token=pA1wt2JJQ3MAAAAA:kLoYLgxVI1azrn4dzIyE06BL40ab1uXy59W5mrALNg_7AlPTkg9M_Jf21A-MU6xoamIUtEzb). [Traditional] regression functions on demographic variables and credit card features yield limited explanatory power compared to other factors such as attitude variables and personality variables  [(Wang et. al, 2011)](https://www.sciencedirect.com/science/article/abs/pii/S0167487010001327). Previous attempts at applying machine learning to classify card applicants into different credit limits has achieved acceptable results (82% predictive accuracy of credit card defaulters with neural networkst) [(Leong et. all., 2019)](https://www.ingentaconnect.com/contentone/asp/jctn/2019/00000016/00000008/art00083).
++ **Problem statement:** Commercial banks need to continually observe the impact of customer's work and life stability on credit card defaults, which is costly to maintain [(Li et. al., 2019)](https://www.sciencedirect.com/science/article/pii/S0378437119304662?casa_token=pA1wt2JJQ3MAAAAA:kLoYLgxVI1azrn4dzIyE06BL40ab1uXy59W5mrALNg_7AlPTkg9M_Jf21A-MU6xoamIUtEzb). Traditional regression functions on demographic variables and credit card features yield limited explanatory power compared to other factors such as attitude variables and personality variables  [(Wang et. al, 2011)](https://www.sciencedirect.com/science/article/abs/pii/S0167487010001327). Previous attempts at applying machine learning to classify card applicants into different credit limits has achieved acceptable results (82% predictive accuracy of credit card defaulters with neural networkst) [(Leong et. all., 2019)](https://www.ingentaconnect.com/contentone/asp/jctn/2019/00000016/00000008/art00083).
 
 + **Goal:** The goal of this exercise is to apply machine learning methods to predict potential credit defaulters based on a set of data available at point of application. The dataset can be accessed [here](https://www.kaggle.com/datasets/rikdifos/credit-card-approval-prediction). 
 
@@ -93,9 +93,9 @@ credit_record <- credit_record %>%
 
 ## FEATURE ENGINEERING
 
-+ **Data analysis and cleaning:** the dataset was screened for nulls, blanks, and duplicates and further trimmed to only include IDs with 20+ months banking history. As displayed below, 88.9% of debtors has more than 0 days of delinquency which could very well be an honest mistake and not representative of their ability to service their payments. Thus we defined **30+ days of delinquency as our target feature, denoted as class 1. <mark>The resulting dataset contained 21,575 customers of which 2,895 customers (c.13%) are in class 1</mark>**.
++ **Data analysis and cleaning:** the dataset was screened for nulls, blanks, and duplicates and further trimmed to only include IDs with 20+ months banking history. As displayed below, 88.9% of debtors have more than 0 days of delinquency which could be an honest mistake and not representative of their ability to service their payments. Thus we defined **<mark> 30+ days of delinquency as our target feature, denoted as class 1. The resulting dataset contained 21,575 customers of which 2,895 customers (c.13%) are in class 1</mark>**.
 
-```{r}
+```{r, fig.height = 2.5, fig.width = 8}
 # check and remove NAs --> no NAs found
 na_rows_application <- application_record[!complete.cases(application_record), ]
 na_rows_credit <- credit_record[!complete.cases(credit_record), ]
@@ -191,12 +191,12 @@ for (i in seq_along(filters)) {
 }
 
 df <- data.frame(
-  debt_category = c('0+ days past due',
-                    '30+ days past due',
-                    '60+ days past due',
-                    '90+ days past due',
-                    '120+ days past due',
-                    'bad debt / write off'),
+  debt_category = c('0+',
+                    '30+',
+                    '60+',
+                    '90+',
+                    '120+',
+                    'Write off'),
   category_count = category_counts
 )
 
@@ -210,14 +210,15 @@ df$proportion <- df$category_count / length(length_ids)
 
 bar_plot <- ggplot(df, aes(x = debt_category)) +
   geom_bar(aes(y = category_count), stat = 'identity', fill = 'blue', alpha = 0.5) +
-  labs(title = 'Bad debtors (count)', x = 'Category', y = 'Count') +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  labs(title = 'Bad debtors (count)', x = 'Days past due', y = 'Count') +
+  theme_minimal() 
   
 line_plot <- ggplot(df, aes(x = debt_category)) +
   geom_line(aes(y = proportion, group = 1), color = 'red', size = 1) +
-  geom_text(aes(y = proportion, label = percent(proportion, accuracy = 0.1)), vjust = -.1, color = 'red') +
-  labs(title = 'Bad debtor (% total)', x = 'Category', y = 'Proportion') +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1), labels = percent) +  # Set breaks at 5% increments and format as percentages
+  labs(title = 'Bad debtor (% total)', x = 'Days past due', y = 'Proportion') +
+  theme_minimal()  
+
 
 grid.arrange(bar_plot, line_plot, ncol = 2)
 
@@ -250,7 +251,7 @@ debt_quality_table <- data.frame(debt_quality = names(debt_quality_counts), coun
 
 + Delinquency rate by occupation type shown below. We can see that delinquency rate does not necessarily increase with lower wages and some occupation has large variability in total income. 
 
-```{r }
+```{r, fig.height = 3.5, fig.width = 8 }
 # Count bad debt by occupation type, descending order
 debt_count <- application_clean %>% 
   filter(debt_quality >0) %>% 
@@ -267,11 +268,19 @@ line.result <- left_join(occupation_count, debt_count, by = "occupation_type") %
 
 line.result$occupation_type <- factor(line.result$occupation_type, levels = line.result$occupation_type)
 
+#line_plot <- ggplot(line.result, aes(x = occupation_type)) +
+#  geom_line(aes(y = ratio, group = 1), color = 'red', size = 1) +
+#  geom_text_repel(aes(y = ratio, label = percent(ratio, accuracy = 0.1)), nudge_x = 0.0, nudge_y = 0.02, color = 'red') +
+#  labs(title = 'Bad debtors by occupation (% total count)', x = 'Occupation', y = 'Value') +
+#  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
 line_plot <- ggplot(line.result, aes(x = occupation_type)) +
   geom_line(aes(y = ratio, group = 1), color = 'red', size = 1) +
-  geom_text_repel(aes(y = ratio, label = percent(ratio, accuracy = 0.1)), nudge_x = 0.0, nudge_y = 0.02, color = 'red') +
+  geom_point(aes(y = ratio), color = 'red', size = 3) +  # Add dots for each data point
+  scale_y_continuous(breaks = seq(0, 1, by = 0.02),  labels = percent_format(scale = 100)) +    # Add ticks every 0.05 on the y-axis
   labs(title = 'Bad debtors by occupation (% total count)', x = 'Occupation', y = 'Value') +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
 
 #Boxplot, x-axis matches line plot
 box_plot <- ggplot(application_clean, aes(x = factor(occupation_type, levels = levels(line.result$occupation_type)), y = income_total)) + 
@@ -357,7 +366,7 @@ application_clean$ID <- NULL
 # Plot 7 and 8: children_count before and after outliers removal
 p_children_1 <- ggplot(application_data_numerical, aes(x = children_count)) +
     geom_histogram(bins = bin_count) +
-    labs(title = 'Children_count (with outliers)')
+    labs(title = 'children_count (with outliers)')
 
 # remove outliers in children_count
 application_clean <- subset(application_clean, children_count <= 10) # 2 rows removed
@@ -366,7 +375,7 @@ application_data_numerical$ID <- NULL
 
 p_children_2 <- ggplot(application_data_numerical, aes(x = children_count)) +
         geom_histogram(bins = bin_count) +
-        labs(title = 'Children_count (outliers removed)')
+        labs(title = 'children_count (outliers removed)')
 
 
 
@@ -482,7 +491,7 @@ apply_smote <- function(dataframe, target_col){
 
 ## CLASSIFICATION METHODS
 
-Five algorithms are used in this exercise and discussed below. Please see results on testing scores in the 'RESULTS' section.
+Five algorithms are used in this exercise and discussed below. Please see testing scores in the <mark>'RESULTS'</mark> section.
 
 ```{r}
 # create empty dataframe to store results
@@ -594,17 +603,11 @@ best_balanced.accuracy <- rf.results.df$balanced.accuracy[max_row_index]
 best_f1.score <- rf.results.df$f1.score[max_row_index]
 
 # Print the values
-cat('Best model parameters (maximizing f1 score):\n')
-cat("- ntree: ", ntree_max,"\n")
-cat("- mtry: ", mtry_max,"\n")
+cat('Best model parameters (maximizing f1 score): ntree: ', ntree_max, ' mtry: ',mtry_max,'\n')
 cat('\n')
 cat("Training scores for the best model:\n")
-cat('- accuracy: ', best_accuracy,'\n')
-cat('- precision: ', best_precision,'\n')
-cat('- sensitivity: ', best_sensitivity,'\n')
-cat('- specificity: ', best_specificity,'\n')
-cat('- balanced accuracy: ', best_balanced.accuracy,'\n')
-cat('- f1 score: ', best_f1.score,'\n')
+cat('- accuracy: ', best_accuracy, '    - precision: ',best_precision, '         - sensitivity: ', best_sensitivity,'\n')
+cat('- specificity: ', best_specificity, ' - balanced accuracy: ',best_balanced.accuracy,' - f1 score: ', best_f1.score,'\n')
 ```
 
 +  Low sensitivity, precision, and f1-score implies the model has high proportion of false negatives and false positives and is unreliable. Overall grid search results shown below.
@@ -645,7 +648,7 @@ grid.arrange(rf.accuracy.plot, rf.sensitivity.plot, rf.precision.plot, rf.f1.sco
 
 + Key features: the top-5 features, which are children_count, income_total_log, age_years, relationship_length, and employment_years, show significant gini decrease values. 
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r, fig.height = 4, fig.width = 8}
 #random forest test score
 set.seed(1)
 
@@ -770,17 +773,12 @@ LogRes.train_results.f1 = confusion_matrix_train$byClass["F1"]
 
 # Print out the training results
 #LogRes.train_results.table
-cat('Best model parameters(maximizing accuracy score):\n')
-cat('- alpha:', best_alpha,'\n')
-cat('- lambda:', best_lambda,'\n')
 
-cat('Training scores for the best model:\n')
-cat('- accuracy: ',LogRes.train_results.accuracy,'\n')
-cat('- precision: ',LogRes.train_results.precision,'\n')
-cat('- sensitivity: ',LogRes.train_results.sensitivity,'\n')
-cat('- specificity: ',LogRes.train_results.specificity,'\n')
-cat('- balanced accuracy: ',LogRes.train_results.balanced.accuracy,'\n')
-cat('- f1 score: ',LogRes.train_results.f1,'\n')
+cat('Best model parameters (maximizing accuracy score): alpha: ', best_alpha, ' lambda: ',best_lambda,'\n')
+cat('\n')
+cat("Training scores for the best model:\n")
+cat('- accuracy: ', LogRes.train_results.accuracy, '    - precision: ',LogRes.train_results.precision, '         - sensitivity: ', LogRes.train_results.sensitivity,'\n')
+cat('- specificity: ', LogRes.train_results.specificity, ' - balanced accuracy: ',LogRes.train_results.balanced.accuracy,' - f1 score: ', LogRes.train_results.f1,'\n')
 
 # Predict using the best model on the test data
 test_probs <- predict(fit, newx = as.matrix(test_data[, -ncol(test_data)]), type = "response")
@@ -818,13 +816,10 @@ overall.results.df['f1.score','LogRes'] <- LogRes.results.f1
 
 results <- grid_search$results
 ```
-```{r}
-fit
-```
 
 + Accuracy scores for different alpha and lambda values shown below:
 
-```{r}
+```{r, fig.height = 2.5, fig.width = 8}
 # Plot
 ggplot(results, aes(x = lambda, y = Accuracy, color = as.factor(alpha))) +
   geom_line(aes(group = alpha)) +
@@ -863,9 +858,9 @@ lda_model <- train(debt_quality ~ .,
 cv_results <- data.frame(Accuracy = lda_model$resample$Accuracy, Iteration = 1:5)
 
 # Print the accuracy on each run of the cross-validation
-for (i in 1:5) {
-  cat(paste("Accuracy on run", i, ":", cv_results$Accuracy[i], "\n"))
-}
+#for (i in 1:5) {
+#  cat(paste("Accuracy on run", i, ":", cv_results$Accuracy[i], "\n"))
+#}
 
 # Extract the best model
 best_lda <- lda_model$finalModel
@@ -882,13 +877,10 @@ lda.train.balanced.accuracy <- (cm_train$byClass['Sensitivity'] + cm_train$byCla
 lda.train.f1.score <- 2*(cm_train$byClass['Precision'] * cm_train$byClass['Sensitivity'])/(cm_train$byClass['Precision'] + cm_train$byClass['Sensitivity'])
                                                                                            
 # Print the results of the best model on the training set
-cat("Results of the best model on the training set:\n")
-cat("Accuracy:",lda.train.accuracy , "\n")
-cat("Sensitivity:",lda.train.sensitivity , "\n")
-cat("Precision:",lda.train.precision, "\n")
-cat("Specificity:",lda.train.specificity, "\n")
-cat("Balanced Accuracy:",lda.train.balanced.accuracy, "\n")
-cat("F1 Score:",lda.train.f1.score , "\n")
+cat("Training scores for the best model:\n")
+cat('- accuracy: ', lda.train.accuracy, '    - precision: ',lda.train.precision, '         - sensitivity: ', lda.train.sensitivity,'\n')
+cat('- specificity: ', lda.train.specificity, ' - balanced accuracy: ',lda.train.balanced.accuracy,' - f1 score: ', lda.train.f1.score,'\n')
+
 
 # Use the best model to make predictions on the test set
 test.pred <- predict(best_lda, newdata = processed_data.test[, -which(names(processed_data.test) == 'debt_quality')])
@@ -904,7 +896,7 @@ overall.results.df['f1.score', 'LDA'] <-2*(cm_best$byClass['Precision'] * cm_bes
 ```
 + Accuracy scores shown below: 
 
-```{r}
+```{r,fig.height = 3, fig.width = 8}
 # Plot the change in accuracy for each run of the cross-validation
 ggplot(cv_results, aes(x = Iteration, y = Accuracy)) +
   geom_line() +
@@ -1014,20 +1006,17 @@ max_balanced_accuracy <- best_model_params$balanced.accuracy
 max_accuracy <- best_model_params$accuracy
 max_precision <- best_model_params$precision
 max_sensitivity <- best_model_params$sensitivity # also known as recall
+max_specificity <- best_model_params$specificity
 max_f1 <- best_model_params$f1.score
 
-cat('Best model parameters (maximizing balanced accuracy):\n')
-cat("- loss function: ", best_loss, "\n")
-cat("- max depth: ", best_maxdepth, "\n")
-cat("- iterations: ", best_iter, "\n")
-cat("- balancing technique: ", best_bal, "\n")
+cat('Best model parameters (maximizing balanced accuracy score):\n')
+cat('- loss function: ', best_loss, '  - max depth: ',best_maxdepth,'\n')
+cat('- iterations: ',best_iter,'        - balancing technique: ', best_bal, '\n')
 cat('\n')
 cat("Training scores for the best model:\n")
-cat('- accuracy: ', max_accuracy, "\n")
-cat('- precision: ', max_precision, "\n")
-cat('- sensitivity: ', max_sensitivity, "\n")
-cat('- balanced accuracy: ', max_balanced_accuracy, "\n")
-cat('- f1 score: ', max_f1, "\n")
+cat('- accuracy: ', max_accuracy, '    - precision: ',max_precision, '         - sensitivity: ', max_sensitivity,'\n')
+cat('- specificity: ', LogRes.train_results.specificity, ' - balanced accuracy: ',max_balanced_accuracy,' - f1 score: ', max_f1,'\n')
+
 
 if(best_bal == "upSample"){
   best_balanced_data <- upSampled_data
@@ -1055,7 +1044,7 @@ overall.results.df['f1.score','AdaBoost'] <- 2 * (ada_test_results$byClass['Prec
 
 + Scores for SMOTE and up-sample shown below:
 
-```{r}
+```{r,fig.height = 2.5, fig.width = 8}
 
 tidy_results <- ada_results.df %>%
   gather(key = "metric", value = "value", accuracy, precision, sensitivity, specificity, balanced.accuracy, f1.score) %>%
@@ -1065,7 +1054,8 @@ tidy_results <- ada_results.df %>%
 ggplot(tidy_results, aes(fill=bal, y=value, x=metric)) + 
   geom_bar(position="dodge", stat="identity") +
   labs(y = "Metric Value", x = "Performance Metric", title = "Comparison of Class Balancing Techniques", fill = "Method") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme_minimal()
+
 
 ```
 
@@ -1077,7 +1067,7 @@ ggplot(tidy_results, aes(fill=bal, y=value, x=metric)) +
 
 + **The best model parameters by f1 score shown below:**
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 #create train and test data
 
 processed_data <- preprocess_data(application_clean, target_col='debt_quality')
@@ -1090,7 +1080,7 @@ processed_data.test <- processed_data[-inTrain,]
 
 ```
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 
 library(e1071)
 
@@ -1126,7 +1116,7 @@ grid_search_svm <- function(train_data, test_data, class_weights) {
 
 ```
 
-```{r, message=FALSE, warning=FALSE, results='hold', fig.show='hold'}
+```{r}
 #Utilize feature selection techniques
 
 #Use pca for selecting features
@@ -1157,16 +1147,13 @@ best_result <- svm.result.df[max_row_index, ]
 class_weight = class_weights[[max_row_index]]
 
 # Print out best model results
-cat('Best model parameters (maximizing f1 score):\n')
-cat("- class weights: ", class_weight, "\n")
 
+cat('Best model parameters (maximizing f1 score): class weights: ', class_weight,'\n')
+cat('\n')
 cat("Training scores for the best model:\n")
-cat('- accuracy: ', best_result$accuracy , "\n")
-cat('- precision: ', best_result$precision, "\n")
-cat('- sensitivity: ', best_result$sensitivity, "\n")
-cat('- specificity: ', best_result$specificity, "\n")
-cat('- balanced accuracy: ', best_result$balanced.accuracy, "\n")
-cat('- f1 score: ', best_result$f1.score, "\n")
+cat('- accuracy: ', best_result$accuracy, '    - precision: ',best_result$precision, '         - sensitivity: ', best_result$sensitivity,'\n')
+cat('- specificity: ', best_result$specificity, ' - balanced accuracy: ',best_result$balanced.accuracy,' - f1 score: ', best_result$f1.score,'\n')
+
 
 # Use the appropriate params to create model
 pca.svm.model <- svm(debt_quality ~ ., data = train_data_pca_full, kernel = "radial", class.weights = class_weight)
@@ -1218,7 +1205,7 @@ grid.arrange(svm.accuracy.plot, svm.sensitivity.plot, svm.precision.plot,svm.f1.
 
 ## RESULTS
 
-```{r}
+```{r, fig.height = 2.5, fig.width = 8}
 rounded.results.df <- round(overall.results.df,3)
 
 # Assuming your dataframe is named rounded.results.df
@@ -1245,13 +1232,13 @@ ggplot(rounded.results.df_long, aes(x = Category, y = Score, fill = Method)) +
 
 + **Sensitivity = (True Positives / (True Positives + False Negatives))**: sensitivity measures the model's ability to correctly identify positive instances from the total number of actual positive instances in the dataset. Random forest scored highest which means the model was able to correctly identify almost all bad debtors in the test set. 
 
-**Final model recommendation:** We recommend Random Forest (RF) for this analysis, though it still has its limitations, as shown by its low specificity score. This implies that the RF model is 'too strict', where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
+**Final model recommendation:** We recommend Random Forest (RF) for this analysis, though it still has its limitations, as shown by its low specificity score. This implies that the RF model is 'too strict', where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives is conservative and carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
 
 ## DISCUSSION
 
-**Potential shortcomings and future work:** (i) Data imbalance: additional data points on bad debt would address the bias experienced in this dataset. (ii) Data features: additional features could be collected which may have higher correlation with the target feature. For example: customer credit score, criminal records, past history of indebtedness, identifier on any existing factors that would signal lower delinquency risk such as letter of guarantee, employer reference, etc. (iii) Hyperparameter tuning: a wider tuning grid could be applied to ensure that each model achieves its global optimum solution. 
+**Potential shortcomings and future work:** (i) Data imbalance: additional data points on bad debt would address the bias experienced in this dataset. (ii) Lack of features: additional features could be collected which may have higher correlation with the target feature. For example: customer credit score, criminal records, past history of indebtedness, identifier on any existing factors that would signal lower delinquency risk such as letter of guarantee, employer reference, etc. (iii) Hyperparameter tuning: a wider tuning grid could be applied to ensure that each model achieves its global optimum solution. 
 
-**Conclusion:** Machine learning can be utilized as a first layer screening for potential bad debtors if it is provided with a rich dataset. Our largest obstacle was data imbalance which can be solved with a larger number (and wider spread) of customer track record and richer information at point of application. This exercise also makes clear why the use of credit score is prevalent in the credit card industry, as it accumulates credit behaviour data from sources not directly available otherwise at point of application.
+**Conclusion:** Machine learning can be utilized as a first layer screening for potential bad debtors if it is provided with a rich dataset. Our largest obstacle was data imbalance which can be solved with a larger number (and wider spread) of customer track record and richer information at point of application. This exercise also clarified the importance of credit score in the credit card industry. Credit score accumulates credit behaviour data from sources not directly available otherwise at point of application. Credit score mayserve as a strong 'leak' of customers' tendency to default in the future.
 
 ## REFERENCES
 
