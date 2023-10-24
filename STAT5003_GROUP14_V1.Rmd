@@ -1218,12 +1218,17 @@ rounded.results.df <- rownames_to_column(rounded.results.df, var = "Category")
 # Reshape the dataframe from wide to long format
 rounded.results.df_long <- gather(rounded.results.df, Method, Score, -Category)
 
-# Create the bar plot
+# Your existing data and ggplot code
 ggplot(rounded.results.df_long, aes(x = Category, y = Score, fill = Method)) +
   geom_bar(stat = "identity", position = "dodge") +
   labs(x = "Scores", y = "Values") +
   ggtitle("Comparison of Scores for Different Methods") +
-  theme_minimal()
+  theme_minimal() +
+  
+  # Specify y-axis breaks, labels, and limits
+  scale_y_continuous(breaks = seq(0, 1.0, by = 0.1),
+                     labels = seq(0, 1.0, by = 0.1),
+                     limits = c(0, 1.0))
 ```
 
 **Due to data imbalance, performance measures which accounts for true values while minimizing false positives and false negatives were analyzed:**
@@ -1232,7 +1237,7 @@ ggplot(rounded.results.df_long, aes(x = Category, y = Score, fill = Method)) +
 
 + **Sensitivity = (True Positives / (True Positives + False Negatives))**: sensitivity measures the model's ability to correctly identify positive instances from the total number of actual positive instances in the dataset. Random forest scored highest which means the model was able to correctly identify almost all bad debtors in the test set. 
 
-**Final model recommendation:** We recommend Random Forest (RF) for this analysis, though it still has its limitations, as shown by its low specificity score. This implies that the RF model is 'too strict', where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives is conservative and carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book).
+**Final model recommendation:** We recommend Random Forest (RF) for this analysis, though it still has its limitations, as shown by its low specificity score. This implies that the RF model is 'too strict', where some good debtors are also flagged as bad debtors. This limitation may be caused by data imbalance which has been minimized by SMOTE but still presents some bias. We are comfortable with this flaw as having false positives is conservative and carry lesser economic impact than having false negatives (e.g., lost revenue instead of bad debt on the banking book). The higher test scores may be caused by underfitting or spurious relationship which will be discussed below.
 
 ## DISCUSSION
 
