@@ -2,7 +2,11 @@
 title: "STAT5003_14_Credit_Card_Analysis"
 author: "STAT5003 group project 14"
 date: "`r Sys.Date()`"
-output: pdf_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
 ---
 
 <style>
@@ -11,7 +15,7 @@ text-align: justify}
 </style>
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo=FALSE, fig.height = 4, fig.width = 8, fig.align = "center", warning = FALSE, results='hold',message=FALSE)
+knitr::opts_chunk$set(echo=TRUE, fig.height = 4, fig.width = 8, fig.align = "center", warning = FALSE, results='hold',message=FALSE)
 ```
 
 ```{r, include = FALSE}
@@ -1191,8 +1195,8 @@ svm.precision.plot <- ggplot(svm.result.df, aes(x = class.weight, y = precision)
 
 svm.f1.score.plot <- ggplot(svm.result.df, aes(x = class.weight, y = f1.score)) +
   geom_line() +
-  labs(x = "class_weight", y = "precision") +
-  ggtitle('Precision') +
+  labs(x = "class_weight", y = "f1 score") +
+  ggtitle('F1 score') +
   theme_minimal()
 
 grid.arrange(svm.accuracy.plot, svm.sensitivity.plot, svm.precision.plot,svm.f1.score.plot,ncol = 2)
